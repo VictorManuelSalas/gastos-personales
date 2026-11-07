@@ -1,4 +1,7 @@
-import { diffDays, formatMXN } from "@gp/core";
+import { addDays, diffDays, formatMXN, paydayOnOrBefore } from "@gp/core";
+import { db, quincenaClose } from "@gp/db";
+import { and, eq } from "drizzle-orm";
+import { CloseQuincena } from "@/components/finance/close-quincena";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FlowRow } from "@/components/finance/flow-row";
@@ -27,6 +30,12 @@ export default async function HomePage() {
   ];
   const ready = setup.every((s) => s.done);
   const nextIn = diffDays(f.now, current!.end) + 1;
+
+  // Cierre de la quincena anterior: se ofrece los primeros 3 días de la nueva quincena.
+  const prevPayday = paydayOnOrBefore(f.rule, addDays(current!.payday, -1));
+  const [closed] = await db.select().from(quincenaClose).where(and(eq(quincenaClose.userId, user.id), eq(quincenaClose.payday, prevPayday)));
+  const accountsCreatedBefore = f.accounts.some((a) => a.createdAt.toISOString().slice(0, 10) <= prevPayday);
+  const offerClose = !closed && accountsCreatedBefore && diffDays(current!.payday, f.now) <= 3;
 
   return (
     <div>
@@ -65,6 +74,8 @@ export default async function HomePage() {
           </p>
         ) : null}
       </section>
+
+      {offerClose ? <CloseQuincena payday={prevPayday} accounts={f.accounts.map((a) => ({ id: a.id, name: a.name, balanceCents: a.balanceCents }))} /> : null}
 
       {!ready ? (
         <GlassCard interactive={false} className="rise d3 mt-12 p-7 md:p-9">

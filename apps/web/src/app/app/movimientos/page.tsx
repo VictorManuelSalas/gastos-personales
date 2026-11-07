@@ -1,7 +1,8 @@
-import { formatMXN, monthStart, today } from "@gp/core";
-import { category, creditLine, db, moneyAccount, transaction } from "@gp/db";
-import { and, desc, eq, gte, isNull } from "drizzle-orm";
+import { centsToInput, formatMXN, monthStart, today } from "@gp/core";
+import { category, creditLine, db, moneyAccount, transaction, transactionSplit } from "@gp/db";
+import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import type { Metadata } from "next";
+import { SplitForm } from "@/components/finance/split-form";
 import { TxnForm } from "@/components/finance/txn-form";
 import { ActionButton } from "@/components/ui/action-form";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -45,7 +46,17 @@ export default async function MovementsPage() {
   ]);
 
   const tagMap = await tagsForTransactions(txns.map((r) => r.t.id));
-  const opt = (kind: "expense" | "income") => cats.filter((c) => c.kind === kind).map((c) => ({ id: c.id, label: `${c.emoji} ${c.name}` }));
+  // Subcategorías con su categoría principal: "🚗 Carro › Gasolina".
+  const label = (c: (typeof cats)[number]) => {
+    const p = c.parentId ? cats.find((x) => x.id === c.parentId) : null;
+    return p ? `${p.emoji} ${p.name} › ${c.name}` : `${c.emoji} ${c.name}`;
+  };
+  const opt = (kind: "expense" | "income") =>
+    cats
+      .filter((c) => c.kind === kind)
+      .map((c) => ({ id: c.id, label: label(c) }))
+      .sort((a, b) => a.label.localeCompare(b.label, "es"));
+  const splits = txns.length ? await db.select().from(transactionSplit).where(inArray(transactionSplit.transactionId, txns.map((r) => r.t.id))) : [];
   const monthExpenses = txns.filter((r) => r.t.kind === "expense" && r.t.date >= monthFrom);
   const spent = monthExpenses.reduce((s, r) => s + r.t.amountCents, 0);
   const byCat = new Map<string, { label: string; cents: number }>();
@@ -112,7 +123,7 @@ export default async function MovementsPage() {
             {txns.map(({ t, catName, catEmoji, accName, lineName, lineColor }) => {
               const incoming = t.kind === "income";
               return (
-                <li key={t.id} className="flex items-center gap-3 rounded-2xl bg-white/[.03] px-4 py-3 ring-1 ring-white/[.06]">
+                <li key={t.id} className="flex flex-wrap items-center gap-3 rounded-2xl bg-white/[.03] px-4 py-3 ring-1 ring-white/[.06]">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[.05] text-[16px]" aria-hidden="true">
                     {t.kind === "card_payment" ? "↗" : (catEmoji ?? "•")}
                   </span>
@@ -139,6 +150,16 @@ export default async function MovementsPage() {
                     {incoming ? "+" : "−"}
                     {formatMXN(t.amountCents)}
                   </span>
+                  {t.kind === "expense" ? (
+                    <div className="order-last basis-full pl-12">
+                      <SplitForm
+                        txnId={t.id}
+                        amountLabel={formatMXN(t.amountCents)}
+                        categories={opt("expense")}
+                        current={splits.filter((sp) => sp.transactionId === t.id).map((sp) => ({ categoryId: sp.categoryId, amount: centsToInput(sp.amountCents) }))}
+                      />
+                    </div>
+                  ) : null}
                   {t.kind === "expense" || t.kind === "income" ? (
                     <ActionButton action={deleteTxnAction} fields={{ id: t.id }} className="!px-3" pending="…">
                       <span aria-label="Borrar">✕</span>

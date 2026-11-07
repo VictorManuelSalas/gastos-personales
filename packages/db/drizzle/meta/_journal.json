@@ -43,6 +43,13 @@
       "when": 1794068760483,
       "tag": "0005_ambitious_rumiko_fujikawa",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794069736007,
+      "tag": "0006_fair_nomad",
+      "breakpoints": true
     }
   ]
 }

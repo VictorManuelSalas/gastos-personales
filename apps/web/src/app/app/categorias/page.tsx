@@ -62,6 +62,15 @@ export default async function CategoriesPage() {
                 <option value="income">Ingreso</option>
               </select>
             </div>
+            <div className="sm:col-span-3">
+              <label htmlFor="ct-parent" className="block text-[12px] text-haze">
+                Dentro de (opcional, para una subcategoría)
+              </label>
+              <select id="ct-parent" name="parentId" defaultValue="" className="field mt-1.5">
+                <option value="">Ninguna: es categoría principal</option>
+                <CategoryOptions list={active.filter((c) => !c.parentId)} />
+              </select>
+            </div>
             <div className="sm:col-span-2">
               <label htmlFor="ct-klass" className="block text-[12px] text-haze">
                 Clase (para la regla 50/30/20)
@@ -167,13 +176,19 @@ export default async function CategoriesPage() {
         <section key={kind} className="mt-12">
           <h2 className="eyebrow">{kind === "expense" ? "Gastos" : "Ingresos"}</h2>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {group(kind).map((c) => (
-              <li key={c.id} className="flex items-center gap-3 rounded-2xl bg-white/[.03] px-4 py-3 ring-1 ring-white/[.06]">
+            {group(kind)
+              .filter((c) => !c.parentId)
+              .flatMap((c) => [c, ...group(kind).filter((x) => x.parentId === c.id)])
+              .map((c) => (
+              <li key={c.id} className={`flex items-center gap-3 rounded-2xl bg-white/[.03] px-4 py-3 ring-1 ring-white/[.06] ${c.parentId ? "sm:ml-6" : ""}`}>
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[.05] text-[16px]" aria-hidden="true">
                   {c.emoji}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px]">{c.name}</p>
+                  <p className="truncate text-[14px]">
+                    {c.parentId ? <span className="text-haze">{all.find((x) => x.id === c.parentId)?.name} › </span> : null}
+                    {c.name}
+                  </p>
                   <p className="text-[11px] text-haze">
                     {KLASS[c.klass]}
                     {c.isAnt ? " · antojo" : ""}

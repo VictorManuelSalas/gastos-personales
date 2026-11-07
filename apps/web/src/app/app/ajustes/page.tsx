@@ -16,6 +16,9 @@ import {
   updateRemindersAction,
 } from "@/server/actions/settings";
 import { telegramConfig } from "@/server/telegram/client";
+import { PushToggle } from "@/components/push-toggle";
+import { updateNotifPrefsAction } from "@/server/actions/notifications";
+import { pushConfig } from "@/server/notify/push";
 
 export const metadata: Metadata = { title: "Ajustes" };
 
@@ -155,6 +158,26 @@ export default async function SettingsPage() {
             </div>
             <div className="sm:col-span-3">
               <SubmitButton>Guardar avisos</SubmitButton>
+            </div>
+          </ActionForm>
+        </GlassCard>
+      </section>
+
+      <section className="mt-12">
+        <h2 className="eyebrow">Notificaciones del teléfono</h2>
+        <GlassCard interactive={false} className="mt-4 p-6 md:p-8">
+          <PushToggle publicKey={pushConfig()?.publicKey ?? null} />
+          <ActionForm action={updateNotifPrefsAction} resetOnOk={false} okMessage="Guardado" className="mt-6 grid gap-3 border-t border-white/[.06] pt-5">
+            <label className="flex items-center gap-2 text-[14px] text-mist">
+              <input type="checkbox" name="summaries" defaultChecked={u!.summaries} className="h-4 w-4 accent-[#8fa8ff]" />
+              Resumen semanal (domingo 7 pm) y mensual (día 1)
+            </label>
+            <label className="flex items-center gap-2 text-[14px] text-mist">
+              <input type="checkbox" name="logReminder" defaultChecked={u!.logReminder} className="h-4 w-4 accent-[#8fa8ff]" />
+              Recordarme registrar si llevo 2 días sin anotar nada
+            </label>
+            <div>
+              <SubmitButton variant="ghost">Guardar</SubmitButton>
             </div>
           </ActionForm>
         </GlassCard>

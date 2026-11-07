@@ -1,7 +1,7 @@
 "use server";
 
-import { today } from "@gp/core";
-import { category, categoryRule, db, incomeSource, moneyAccount, transaction } from "@gp/db";
+import { formatMXN, parseMoney, today } from "@gp/core";
+import { category, categoryRule, db, incomeSource, moneyAccount, transaction, transactionSplit } from "@gp/db";
 import { and, eq, sql } from "drizzle-orm";
 import { learnCategory, normalizeMerchant, suggestCategory } from "@/server/finance/categorize";
 import { deleteTransaction, recordTransaction } from "@/server/finance/mutations";
@@ -159,6 +159,9 @@ export async function createCategoryAction(_p: ActionState, f: FormData): Promis
   const kind = str(f, "kind") === "income" ? "income" : "expense";
   const klass = (["essential", "lifestyle", "savings"] as const).find((k) => k === str(f, "klass")) ?? "lifestyle";
   if (!name) return fail("Ponle nombre a la categoría.");
+  // Subcategoría (dos niveles): el padre debe ser del mismo tipo y de primer nivel.
+  const parent = await ownCategory(user.id, str(f, "parentId") || null);
+  if (parent && (parent.kind !== kind || parent.parentId)) return fail("Elige una categoría principal del mismo tipo.");
   await db.insert(category).values({
     id: newId(),
     userId: user.id,
@@ -167,6 +170,7 @@ export async function createCategoryAction(_p: ActionState, f: FormData): Promis
     kind,
     klass,
     isAnt: f.get("isAnt") === "on",
+    parentId: parent?.id ?? null,
     sortOrder: 999,
   });
   revalidatePath("/app", "layout");
@@ -231,4 +235,38 @@ export async function deleteRuleAction(f: FormData) {
   const { user } = await requireUser();
   await db.delete(categoryRule).where(and(eq(categoryRule.id, str(f, "id")), eq(categoryRule.userId, user.id)));
   revalidatePath("/app/categorias");
+}
+
+/**
+ * RF-14: divide un gasto en varias categorías (p. ej. un ticket del súper con
+ * despensa y artículos del hogar). Las partes deben sumar el monto del movimiento.
+ */
+export async function splitTxnAction(_p: ActionState, f: FormData): Promise<ActionState> {
+  const { user } = await requireUser();
+  const [t] = await db.select().from(transaction).where(and(eq(transaction.id, str(f, "id")), eq(transaction.userId, user.id)));
+  if (!t || t.kind !== "expense") return fail("Solo se pueden dividir gastos.");
+  const cats = f.getAll("splitCategory").map(String);
+  const amounts = f.getAll("splitAmount").map((v) => String(v).trim());
+  const parts: { categoryId: string | null; amountCents: number }[] = [];
+  for (let i = 0; i < cats.length; i++) {
+    if (!amounts[i]) continue;
+    const cents = parseMoney(amounts[i]!);
+    if (cents == null || cents <= 0) return fail("Revisa los montos de cada parte.");
+    const c = cats[i] ? await ownCategory(user.id, cats[i]!) : null;
+    parts.push({ categoryId: c?.id ?? null, amountCents: cents });
+  }
+  if (parts.length === 0) {
+    await db.delete(transactionSplit).where(eq(transactionSplit.transactionId, t.id));
+    revalidatePath("/app", "layout");
+    return ok();
+  }
+  if (parts.length < 2) return fail("Para dividir necesitas al menos dos partes.");
+  const sum = parts.reduce((s, p) => s + p.amountCents, 0);
+  if (sum !== t.amountCents) return fail(`Las partes suman ${formatMXN(sum)}; deben sumar ${formatMXN(t.amountCents)}.`);
+  await db.transaction(async (tx) => {
+    await tx.delete(transactionSplit).where(eq(transactionSplit.transactionId, t.id));
+    await tx.insert(transactionSplit).values(parts.map((p) => ({ id: newId(), transactionId: t.id, ...p })));
+  });
+  revalidatePath("/app", "layout");
+  return ok();
 }

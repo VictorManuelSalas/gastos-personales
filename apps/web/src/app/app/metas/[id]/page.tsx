@@ -40,7 +40,7 @@ export default async function GoalPage({ params }: { params: Promise<{ id: strin
       <section className="mt-6 grid items-center gap-10 md:grid-cols-[1fr_auto]">
         <div>
           <p className="eyebrow rise">
-            {g.emoji} {g.kind === "emergency" ? `Fondo de emergencia · ${g.emergencyMonths ?? 3} ${(g.emergencyMonths ?? 3) === 1 ? "mes" : "meses"} de gastos` : "Meta"}
+            {g.emoji} {g.kind === "sinking" ? "Gasto anual · se reinicia cada año" : g.kind === "emergency" ? `Fondo de emergencia · ${g.emergencyMonths ?? 3} ${(g.emergencyMonths ?? 3) === 1 ? "mes" : "meses"} de gastos` : "Meta"}
           </p>
           <h1 className="rise d1 mt-4 text-[clamp(2.6rem,7vw,4.6rem)] font-semibold leading-[0.95] tracking-tighter chrome">{g.name}</h1>
           <p className="num rise d2 mt-5 text-lg text-mist">

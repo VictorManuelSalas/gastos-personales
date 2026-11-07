@@ -20,6 +20,10 @@ export const user = pgTable("user", {
   telegramLinkedAt: timestamp("telegram_linked_at", { withTimezone: true }),
   /** Días antes de la fecha límite en que se avisa, separados por coma. */
   reminderDays: text("reminder_days").notNull().default("5,3,1,0"),
+  /** Resumen semanal (domingo 19:00) y mensual (día 1). */
+  summaries: boolean("summaries").notNull().default(true),
+  /** "¿Gastaste algo hoy?" tras 2 días sin registros (apagado por defecto). */
+  logReminder: boolean("log_reminder").notNull().default(false),
   quietStart: integer("quiet_start").notNull().default(22),
   quietEnd: integer("quiet_end").notNull().default(8),
   createdAt: ts("created_at").notNull().defaultNow(),
@@ -286,6 +290,8 @@ export const notification = pgTable(
     key: text("key").notNull(),
     kind: text("kind").notNull(),
     channel: text("channel").$type<"telegram">().notNull().default("telegram"),
+    /** Leída en la bandeja de la app. */
+    readAt: ts("read_at"),
     body: text("body").notNull(),
     sentAt: ts("sent_at"),
     error: text("error"),
@@ -302,7 +308,7 @@ export const goal = pgTable(
   {
     id: text("id").primaryKey(),
     userId: owner(),
-    kind: text("kind").$type<"goal" | "emergency">().notNull().default("goal"),
+    kind: text("kind").$type<"goal" | "emergency" | "sinking">().notNull().default("goal"),
     name: text("name").notNull(),
     emoji: text("emoji").notNull().default("🎯"),
     /** Objetivo fijo. En el fondo de emergencia puede ser null y se calcula (RN-14). */
@@ -605,6 +611,50 @@ export const projectClient = pgTable("project_client", {
   active: boolean("active").notNull().default(true),
   createdAt: ts("created_at").notNull().defaultNow(),
 });
+
+// ── Fase 4: pendientes del PRD ────────────────────────────────────────────────
+
+/** Suscripción de notificaciones push de un navegador (PWA). */
+export const pushSubscription = pgTable(
+  "push_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("push_subscription_user_idx").on(t.userId)],
+);
+
+/** Movimiento dividido en varias categorías (RF-14). La suma = monto del movimiento. */
+export const transactionSplit = pgTable(
+  "txn_split",
+  {
+    id: text("id").primaryKey(),
+    transactionId: text("txn_id")
+      .notNull()
+      .references(() => transaction.id, { onDelete: "cascade" }),
+    categoryId: text("category_id").references(() => category.id, { onDelete: "set null" }),
+    amountCents: cents("amount_cents").notNull(),
+  },
+  (t) => [index("txn_split_txn_idx").on(t.transactionId)],
+);
+
+/** Cierre de quincena: el saldo real se concilió contra el calculado (PRD 7.10). */
+export const quincenaClose = pgTable(
+  "quincena_close",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    payday: day("payday").notNull(),
+    expectedCents: cents("expected_cents").notNull(),
+    actualCents: cents("actual_cents").notNull(),
+    closedAt: ts("closed_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("quincena_close_uq").on(t.userId, t.payday)],
+);
 
 export type WishlistItem = typeof wishlistItem.$inferSelect;
 export type RecurringBill = typeof recurringBill.$inferSelect;

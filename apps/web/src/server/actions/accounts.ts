@@ -1,7 +1,7 @@
 "use server";
 
-import { db, moneyAccount } from "@gp/db";
-import { and, eq, sql } from "drizzle-orm";
+import { db, moneyAccount, quincenaClose } from "@gp/db";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { fail, newId, ok, optMoney, str, type ActionState } from "./util";
@@ -67,4 +67,35 @@ export async function archiveAccountAction(f: FormData) {
     .set({ archivedAt: new Date(), isDefault: false })
     .where(and(eq(moneyAccount.id, str(f, "id")), eq(moneyAccount.userId, user.id)));
   revalidatePath("/app", "layout");
+}
+
+/**
+ * Cierre de quincena (PRD 7.10): el usuario confirma o corrige el saldo real de cada
+ * cuenta; se guarda la diferencia contra lo que la app calculaba.
+ */
+export async function closeQuincenaAction(_p: ActionState, f: FormData): Promise<ActionState> {
+  const { user } = await requireUser();
+  const payday = str(f, "payday");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(payday)) return fail("Quincena inválida.");
+  const accounts = await db.select().from(moneyAccount).where(and(eq(moneyAccount.userId, user.id), isNull(moneyAccount.archivedAt)));
+  let expected = 0;
+  let actual = 0;
+  const updates: { id: string; cents: number }[] = [];
+  for (const a of accounts) {
+    const raw = optMoney(f, `balance_${a.id}`);
+    if (raw === undefined) return fail(`Revisa el saldo de ${a.name}.`);
+    expected += a.balanceCents;
+    const value = raw ?? a.balanceCents;
+    actual += value;
+    if (value !== a.balanceCents) updates.push({ id: a.id, cents: value });
+  }
+  await db.transaction(async (tx) => {
+    for (const u of updates) await tx.update(moneyAccount).set({ balanceCents: u.cents }).where(eq(moneyAccount.id, u.id));
+    await tx
+      .insert(quincenaClose)
+      .values({ id: newId(), userId: user.id, payday, expectedCents: expected, actualCents: actual })
+      .onConflictDoNothing();
+  });
+  revalidatePath("/app", "layout");
+  return ok();
 }

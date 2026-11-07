@@ -13,29 +13,34 @@ export function GoalForm({
   avgEssentialLabel: string | null;
   hasEmergency: boolean;
 }) {
-  const [kind, setKind] = useState<"goal" | "emergency">(hasEmergency ? "goal" : "emergency");
+  const [kind, setKind] = useState<"goal" | "emergency" | "sinking">(hasEmergency ? "goal" : "emergency");
   const emergency = kind === "emergency";
+  const sinking = kind === "sinking";
 
   return (
     <ActionForm action={createGoalAction} className="grid gap-4 sm:grid-cols-2">
       <input type="hidden" name="kind" value={kind} />
-      {!hasEmergency ? (
-        <div className="grid grid-cols-2 rounded-full bg-white/[.05] p-1 text-[13px] ring-1 ring-white/10 sm:col-span-2" role="radiogroup" aria-label="Tipo de meta">
-          {(["emergency", "goal"] as const).map((k) => (
-            <button
-              key={k}
-              type="button"
-              role="radio"
-              aria-checked={kind === k}
-              onClick={() => setKind(k)}
-              className={`btn rounded-full py-2 ${kind === k ? "bg-white/[.12] text-ink ring-1 ring-white/15" : "text-haze"}`}
-            >
-              {k === "emergency" ? "Fondo de emergencia" : "Otra meta"}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <div className="grid grid-cols-3 rounded-full bg-white/[.05] p-1 text-[12px] ring-1 ring-white/10 sm:col-span-2 sm:text-[13px]" role="radiogroup" aria-label="Tipo de meta">
+        {(hasEmergency ? (["goal", "sinking"] as const) : (["emergency", "goal", "sinking"] as const)).map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="radio"
+            aria-checked={kind === k}
+            onClick={() => setKind(k)}
+            className={`btn rounded-full py-2 ${kind === k ? "bg-white/[.12] text-ink ring-1 ring-white/15" : "text-haze"}`}
+          >
+            {k === "emergency" ? "Emergencia" : k === "sinking" ? "Gasto anual" : "Meta"}
+          </button>
+        ))}
+      </div>
 
+      {sinking ? (
+        <p className="text-[13px] leading-relaxed text-mist sm:col-span-2">
+          Para gastos que llegan cada año: diciembre, seguro o tenencia del carro, inscripciones. Aparta un poco cada quincena y, cuando llegue la
+          fecha, el dinero ya está. La fecha avanza sola al año siguiente.
+        </p>
+      ) : null}
       {emergency ? (
         <p className="text-[13px] leading-relaxed text-mist sm:col-span-2">
           Es lo primero que conviene juntar: te protege de endeudarte cuando falla el carro o hay un gasto médico.{" "}
@@ -50,13 +55,13 @@ export function GoalForm({
           <label htmlFor="gl-emoji" className="block text-[12px] text-haze">
             Emoji
           </label>
-          <input id="gl-emoji" name="emoji" maxLength={4} placeholder={emergency ? "🛟" : "✈️"} className="field mt-1.5 text-center" />
+          <input id="gl-emoji" name="emoji" maxLength={4} placeholder={emergency ? "🛟" : sinking ? "🎄" : "✈️"} className="field mt-1.5 text-center" />
         </div>
         <div>
           <label htmlFor="gl-name" className="block text-[12px] text-haze">
             Nombre
           </label>
-          <input id="gl-name" name="name" placeholder={emergency ? "Fondo de emergencia" : "Viaje a Japón"} className="field mt-1.5" />
+          <input id="gl-name" name="name" placeholder={emergency ? "Fondo de emergencia" : sinking ? "Diciembre" : "Viaje a Japón"} className="field mt-1.5" />
         </div>
       </div>
 
@@ -75,13 +80,13 @@ export function GoalForm({
 
       <div>
         <label htmlFor="gl-target" className="block text-[12px] text-haze">
-          {emergency ? "Objetivo (opcional, si no se calcula)" : "¿Cuánto quieres juntar?"}
+          {emergency ? "Objetivo (opcional, si no se calcula)" : sinking ? "¿Cuánto cuesta cada año?" : "¿Cuánto quieres juntar?"}
         </label>
         <input id="gl-target" name="target" inputMode="decimal" placeholder={emergency ? "" : "40000"} className="field num mt-1.5" />
       </div>
       <div>
         <label htmlFor="gl-date" className="block text-[12px] text-haze">
-          ¿Para cuándo? (opcional)
+          {sinking ? "¿Cuándo llega el gasto?" : "¿Para cuándo? (opcional)"}
         </label>
         <input id="gl-date" name="targetDate" type="date" className="field mt-1.5" />
       </div>

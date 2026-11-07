@@ -43,12 +43,27 @@ export async function avgEssentialMonthly(userId: string, now: ISODate) {
   return Math.round(rows.reduce((s, r) => s + r.amount, 0) / 3);
 }
 
+function addMonthsKeepDay(d: ISODate, n: number): ISODate {
+  const [y, m, day] = d.split("-").map(Number);
+  const t = new Date(Date.UTC(y!, m! - 1 + n, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(Math.min(day!, last)).padStart(2, "0")}`;
+}
+
 export async function loadGoals(userId: string, rule: PaydayRule, now: ISODate): Promise<GoalView[]> {
   const [goals, movements, accounts] = await Promise.all([
     db.select().from(goal).where(and(eq(goal.userId, userId), isNull(goal.archivedAt))).orderBy(goal.createdAt),
     db.select().from(goalMovement).where(eq(goalMovement.userId, userId)),
     db.select({ id: moneyAccount.id, inAvailable: moneyAccount.inAvailable }).from(moneyAccount).where(eq(moneyAccount.userId, userId)),
   ]);
+  // RN-15: un fondo de previsión se reinicia cada año; al pasar su fecha, avanza 12 meses.
+  for (const g of goals) {
+    if (g.kind !== "sinking" || !g.targetDate || g.targetDate >= now) continue;
+    let next = g.targetDate;
+    while (next < now) next = addMonthsKeepDay(next, 12);
+    await db.update(goal).set({ targetDate: next }).where(eq(goal.id, g.id));
+    g.targetDate = next;
+  }
   const needsAvg = goals.some((g) => g.kind === "emergency" && g.targetCents == null);
   const avg = needsAvg ? await avgEssentialMonthly(userId, now) : 0;
 

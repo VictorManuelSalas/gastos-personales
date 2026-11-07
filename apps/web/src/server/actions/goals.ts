@@ -26,7 +26,7 @@ async function ownGoal(userId: string, id: string) {
 
 export async function createGoalAction(_p: ActionState, f: FormData): Promise<ActionState> {
   const { user } = await requireUser();
-  const kind = str(f, "kind") === "emergency" ? "emergency" : "goal";
+  const kind = (["emergency", "sinking"] as const).find((k) => k === str(f, "kind")) ?? "goal";
   const name = str(f, "name") || (kind === "emergency" ? "Fondo de emergencia" : "");
   const target = optMoney(f, "target");
   const targetDate = isoDate(f, "targetDate");
@@ -35,14 +35,15 @@ export async function createGoalAction(_p: ActionState, f: FormData): Promise<Ac
   const account = await ownAccount(user.id, str(f, "accountId") || null);
   if (!name) return fail("Ponle nombre a la meta, por ejemplo Viaje a Japón.");
   if (target === undefined || auto === undefined) return fail("Revisa los montos: escribe solo números.");
-  if (kind === "goal" && !target) return fail("Escribe cuánto quieres juntar.");
+  if (kind !== "emergency" && !target) return fail(kind === "sinking" ? "Escribe cuánto cuesta ese gasto cada año." : "Escribe cuánto quieres juntar.");
+  if (kind === "sinking" && !targetDate) return fail("Elige la fecha en que llega ese gasto (p. ej. 15 de diciembre).");
   const id = newId();
   await db.insert(goal).values({
     id,
     userId: user.id,
     kind,
     name,
-    emoji: str(f, "emoji").slice(0, 4) || (kind === "emergency" ? "🛟" : "🎯"),
+    emoji: str(f, "emoji").slice(0, 4) || (kind === "emergency" ? "🛟" : kind === "sinking" ? "📅" : "🎯"),
     targetCents: target,
     targetDate,
     emergencyMonths: months,

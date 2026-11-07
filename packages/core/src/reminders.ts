@@ -104,7 +104,7 @@ export function remindersDue(input: {
   }
 
   const pd = input.payday;
-  if (pd && pd.date === today && hour >= 8) {
+  if (pd && pd.date === today && hour >= 8 && (pd.inCents > 0 || pd.count > 0)) {
     out.push({
       key: `${userId}:payday:${today}`,
       kind: "payday",
@@ -116,4 +116,42 @@ export function remindersDue(input: {
     });
   }
   return out;
+}
+
+// ── Avisos de la Fase 4 (PRD 7.11) ──────────────────────────────────────────────
+
+/** Hito más alto alcanzado por una meta (25/50/75/100 %), o null. */
+export function goalMilestone(progressPct: number): 25 | 50 | 75 | 100 | null {
+  if (progressPct >= 100) return 100;
+  if (progressPct >= 75) return 75;
+  if (progressPct >= 50) return 50;
+  if (progressPct >= 25) return 25;
+  return null;
+}
+
+/**
+ * Meta en riesgo: con el aporte automático actual no se llega a la fecha objetivo
+ * (el aporte sugerido supera al automático en más de 25 %, o no hay aporte automático
+ * y faltan menos de 6 quincenas).
+ */
+export function goalAtRisk(g: { autoCents: number | null; suggestedCents: number | null; paydaysLeft: number | null; progress: number }) {
+  if (g.progress >= 100 || g.suggestedCents == null || g.paydaysLeft == null) return false;
+  if (g.autoCents && g.autoCents > 0) return g.suggestedCents > g.autoCents * 1.25;
+  return g.paydaysLeft <= 6 && g.suggestedCents > 0;
+}
+
+/** Gasto inusual: más del doble del promedio de su categoría (con al menos 3 gastos previos). */
+export function isUnusualExpense(amountCents: number, previous: number[]) {
+  if (previous.length < 3) return false;
+  const avg = previous.reduce((s, x) => s + x, 0) / previous.length;
+  return amountCents > avg * 2 && amountCents - avg >= 20_000; // y al menos $200 por encima
+}
+
+/** ¿Toca el resumen semanal (domingo desde las 19:00) o el mensual (día 1 desde las 9:00)? */
+export function summaryDue(today: ISODate, hour: number): "weekly" | "monthly" | null {
+  const [y, m, d] = today.split("-").map(Number);
+  if (d === 1 && hour >= 9) return "monthly";
+  const weekday = new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay();
+  if (weekday === 0 && hour >= 19) return "weekly";
+  return null;
 }
