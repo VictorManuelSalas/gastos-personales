@@ -12,7 +12,7 @@ App de finanzas personales para la familia: tarjetas, quincenas, metas y un bot 
 - Fase 2 lista: registrar todo escribiéndole al bot; metas y fondo de emergencia con apartados por quincena; Me deben; análisis con salud financiera, presupuestos y gráficas; simulador "¿Me alcanza?"; etiquetas y modo viaje; fotos de tickets y notas de voz leídas con IA (ver *Inteligencia artificial*).
 - Fase 3 lista: servicios y suscripciones (vencimientos, avisos, gastos divididos y detector automático), lista de deseos con 72 h de espera, patrimonio neto, reporte anual, exportación a Excel, espacios compartidos (quién le debe a quién y metas en común) y proyectos/negocios (clientes, cobros, costos y retorno).
 - Fase 4 lista (pendientes del PRD): bandeja de avisos con contador, notificaciones push en Android (PWA), resúmenes semanal y mensual, hitos y metas en riesgo, MSI por terminar, gasto inusual, uso alto de crédito, recordatorio de registro (opcional), fondos de previsión anuales, movimientos divididos, subcategorías y cierre de quincena.
-- Notas de voz: pendiente; la API de Claude no transcribe audio, se necesita un servicio de transcripción (p. ej. Whisper).
+- IA por usuario: cada quien elige Gemini, OpenAI o Claude y puede usar su propia API key (cifrada). Notas de voz con Gemini u OpenAI.
 
 Pruebas del núcleo (fechas, ciclos, quincenas, MSI):
 
