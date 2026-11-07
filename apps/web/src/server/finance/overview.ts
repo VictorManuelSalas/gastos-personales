@@ -39,6 +39,7 @@ import {
 } from "@gp/db";
 import { and, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
 import { loadGoals } from "./goals";
+import { billItems } from "./bills";
 
 export const QUINCENAS_AHEAD = 6;
 
@@ -251,6 +252,9 @@ export async function loadFinance(
       });
     }
   }
+
+  // Servicios y suscripciones pagados desde una cuenta (los de tarjeta van en su ciclo).
+  items.push(...(await billItems(userId, rule, currentPayday, horizonEnd)));
 
   const availableCents = balanceCents - reservedCents;
   const quincenas: QuincenaBlock[] = projectQuincenas({ today: now, balanceCents: availableCents, rule, items, count: QUINCENAS_AHEAD });

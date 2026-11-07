@@ -1,7 +1,9 @@
-import { budgetStatus, formatMXN, inQuietHours, monthStart, remindersDue, today, TZ, type Reminder } from "@gp/core";
-import { db, notification, user } from "@gp/db";
-import { eq, isNotNull } from "drizzle-orm";
+import { addDays, budgetStatus, diffDays, formatMXN, inQuietHours, monthStart, remindersDue, today, TZ, type Reminder } from "@gp/core";
+import { db, notification, user, wishlistItem } from "@gp/db";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { monthAnalytics } from "@/server/finance/analytics";
+import { upcomingBills } from "@/server/finance/bills";
+import { receivableBalances } from "@/server/finance/mutations";
 import { loadFinance, pendingPayments } from "@/server/finance/overview";
 import { newId } from "@/server/actions/util";
 import { sendMessage, telegramConfig } from "./client";
@@ -62,6 +64,49 @@ export async function runReminders(now = new Date()) {
                 : `🟡 Vas en ${st.pct}% del presupuesto de ${b.label}: ${formatMXN(b.spent, { round: true })} de ${formatMXN(b.limit, { round: true })}.`,
           };
           reminders.push(budgetReminder);
+        }
+      }
+
+      if (!inQuietHours(hour, prefs) && hour >= 9) {
+        // Servicios y suscripciones: 3 días antes y el mismo día.
+        for (const { bill, date: due } of await upcomingBills(u.id, date, addDays(date, 3))) {
+          const left = diffDays(date, due);
+          if (left !== 3 && left !== 0) continue;
+          reminders.push({
+            key: `${u.id}:bill:${bill.id}:${due}:${left}`,
+            kind: "due",
+            text: `🧾 ${bill.name} ${left === 0 ? "vence <b>hoy</b>" : "vence en 3 días"}: ${formatMXN(bill.amountCents)}${bill.splitParts > 1 ? ` (se divide entre ${bill.splitParts})` : ""}.`,
+          });
+        }
+
+        // Lista de deseos: ya pasaron las 72 h.
+        const ready = await db
+          .select()
+          .from(wishlistItem)
+          .where(and(eq(wishlistItem.userId, u.id), eq(wishlistItem.status, "waiting"), lte(wishlistItem.availableAt, now)));
+        for (const w of ready) {
+          reminders.push({
+            key: `${u.id}:wish:${w.id}`,
+            kind: "due",
+            text: `⏳ Ya pasaron 72 horas. ¿Todavía quieres <b>${w.product}</b> (${formatMXN(w.priceCents)})? Antes de comprar prueba /simula.`,
+            buttons: [
+              ["Lo compré", `wish:${w.id}:bought`],
+              ["Ya no lo quiero", `wish:${w.id}:dropped`],
+            ],
+          });
+        }
+
+        // Me deben: resumen el día 1 de cada mes.
+        if (date.endsWith("-01")) {
+          const open = (await receivableBalances(u.id)).filter((r) => r.status === "active" && r.pendingCents > 0);
+          const total = open.reduce((s, r) => s + r.pendingCents, 0);
+          if (total > 0) {
+            reminders.push({
+              key: `${u.id}:medeben:${date.slice(0, 7)}`,
+              kind: "due",
+              text: `🤝 Te deben ${formatMXN(total)} en ${open.length} préstamos. Revisa Me deben en la app; ahí puedes copiar un recordatorio amable para cada persona.`,
+            });
+          }
         }
       }
 

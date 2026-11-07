@@ -243,6 +243,8 @@ export const transaction = pgTable(
     /** Pago de tarjeta: corte del ciclo pagado. Ingreso recurrente: día de cobro. */
     periodDate: day("period_date"),
     incomeSourceId: text("income_source_id").references(() => incomeSource.id, { onDelete: "set null" }),
+    /** Pago de un servicio o suscripción recurrente. */
+    billId: text("bill_id").references(() => recurringBill.id, { onDelete: "set null" }),
     merchant: text("merchant"),
     note: text("note"),
     origin: text("origin").$type<"web" | "telegram" | "import">().notNull().default("web"),
@@ -443,6 +445,171 @@ export const travelMode = pgTable("travel_mode", {
   startedAt: ts("started_at").notNull().defaultNow(),
 });
 
+// ── Fase 3 (PRD 7.10) ─────────────────────────────────────────────────────────
+
+/** Lista de deseos con enfriamiento de 72 h (RF-37). */
+export const wishlistItem = pgTable(
+  "wishlist_item",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    product: text("product").notNull(),
+    priceCents: cents("price_cents").notNull(),
+    months: integer("months").notNull().default(1),
+    creditLineId: text("credit_line_id").references(() => creditLine.id, { onDelete: "set null" }),
+    note: text("note"),
+    availableAt: ts("available_at").notNull(),
+    status: text("status").$type<"waiting" | "bought" | "dropped">().notNull().default("waiting"),
+    decidedAt: ts("decided_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("wishlist_user_idx").on(t.userId)],
+);
+
+/** Servicios (luz, agua, internet) y suscripciones con vencimiento y división (RN-23). */
+export const recurringBill = pgTable(
+  "recurring_bill",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    kind: text("kind").$type<"service" | "subscription">().notNull(),
+    name: text("name").notNull(),
+    amountCents: cents("amount_cents").notNull(),
+    dayOfMonth: integer("day_of_month").notNull(),
+    /** Cada cuántos meses se cobra (1 mensual, 2 bimestral, 12 anual). */
+    everyMonths: integer("every_months").notNull().default(1),
+    /** Mes (1-12) de referencia para cobros no mensuales. */
+    anchorMonth: integer("anchor_month"),
+    accountId: text("account_id").references(() => moneyAccount.id, { onDelete: "set null" }),
+    creditLineId: text("credit_line_id").references(() => creditLine.id, { onDelete: "set null" }),
+    categoryId: text("category_id").references(() => category.id, { onDelete: "set null" }),
+    /** Persona con quien se divide; su parte = monto / splitParts. */
+    splitContactId: text("split_contact_id").references(() => contact.id, { onDelete: "set null" }),
+    splitParts: integer("split_parts").notNull().default(1),
+    active: boolean("active").notNull().default(true),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("recurring_bill_user_idx").on(t.userId)],
+);
+
+/** Espacios compartidos (RF-39): gastos en común y quién le debe a quién. */
+export const space = pgTable("space", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+export const spaceMember = pgTable(
+  "space_member",
+  {
+    spaceId: text("space_id")
+      .notNull()
+      .references(() => space.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    joinedAt: ts("joined_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("space_member_uq").on(t.spaceId, t.userId), index("space_member_user_idx").on(t.userId)],
+);
+
+export const sharedExpense = pgTable(
+  "shared_expense",
+  {
+    id: text("id").primaryKey(),
+    spaceId: text("space_id")
+      .notNull()
+      .references(() => space.id, { onDelete: "cascade" }),
+    paidBy: text("paid_by")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    /** "expense" = gasto en común; "settlement" = pago entre miembros para saldar. */
+    kind: text("kind").$type<"expense" | "settlement">().notNull().default("expense"),
+    concept: text("concept").notNull(),
+    amountCents: cents("amount_cents").notNull(),
+    /** Para "settlement": quién recibió el pago. */
+    paidTo: text("paid_to").references(() => user.id, { onDelete: "cascade" }),
+    date: day("date").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("shared_expense_space_idx").on(t.spaceId)],
+);
+
+/** Parte de cada miembro en un gasto compartido. */
+export const sharedShare = pgTable(
+  "shared_share",
+  {
+    expenseId: text("expense_id")
+      .notNull()
+      .references(() => sharedExpense.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    shareCents: cents("share_cents").notNull(),
+  },
+  (t) => [uniqueIndex("shared_share_uq").on(t.expenseId, t.userId)],
+);
+
+/** Meta compartida de un espacio y aportes de cada miembro. */
+export const spaceGoal = pgTable("space_goal", {
+  id: text("id").primaryKey(),
+  spaceId: text("space_id")
+    .notNull()
+    .references(() => space.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  emoji: text("emoji").notNull().default("🎯"),
+  targetCents: cents("target_cents").notNull(),
+  targetDate: day("target_date"),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+export const spaceGoalContribution = pgTable("space_goal_contribution", {
+  id: text("id").primaryKey(),
+  goalId: text("goal_id")
+    .notNull()
+    .references(() => spaceGoal.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  amountCents: cents("amount_cents").notNull(),
+  date: day("date").notNull(),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+/** Proyectos o negocios (RF-40): ingresos y costos por etiqueta, inversión y clientes. */
+export const project = pgTable(
+  "project",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    name: text("name").notNull(),
+    investmentCents: cents("investment_cents").notNull().default(0),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tag.id, { onDelete: "cascade" }),
+    accountId: text("account_id").references(() => moneyAccount.id, { onDelete: "set null" }),
+    archivedAt: ts("archived_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("project_user_idx").on(t.userId)],
+);
+
+export const projectClient = pgTable("project_client", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id")
+    .notNull()
+    .references(() => project.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  monthlyCents: cents("monthly_cents").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: ts("created_at").notNull().defaultNow(),
+});
+
+export type WishlistItem = typeof wishlistItem.$inferSelect;
+export type RecurringBill = typeof recurringBill.$inferSelect;
+export type Space = typeof space.$inferSelect;
+export type Project = typeof project.$inferSelect;
 export type User = typeof user.$inferSelect;
 export type Invitation = typeof invitation.$inferSelect;
 export type Budget = typeof budget.$inferSelect;

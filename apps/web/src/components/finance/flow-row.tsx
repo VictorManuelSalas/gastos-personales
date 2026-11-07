@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { payCycleAction } from "@/server/actions/cards";
+import { payBillAction } from "@/server/actions/bills";
 import { contributeGoalAction } from "@/server/actions/goals";
 import { confirmIncomeAction } from "@/server/actions/money";
 
@@ -11,7 +12,7 @@ export type RowAccount = { id: string; name: string; isDefault: boolean };
 
 export type RowItem = {
   id: string;
-  kind: "income" | "card" | "loan" | "goal";
+  kind: "income" | "card" | "loan" | "goal" | "bill";
   label: string;
   dateLabel: string;
   amountLabel: string;
@@ -31,6 +32,7 @@ const ease = [0.16, 1, 0.3, 1] as const;
 export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: RowAccount[]; today: string }) {
   const [open, setOpen] = useState(false);
   const isGoal = item.kind === "goal";
+  const isBill = item.kind === "bill";
   const canAct = item.status === "pending" && (item.direction === "out" || item.confirmable);
   const defaultAccount = item.ref?.accountId || accounts.find((a) => a.isDefault)?.id || accounts[0]?.id || "";
 
@@ -80,12 +82,17 @@ export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: Ro
             className="overflow-hidden"
           >
             <ActionForm
-              action={item.direction === "in" ? confirmIncomeAction : isGoal ? contributeGoalAction : payCycleAction}
+              action={item.direction === "in" ? confirmIncomeAction : isGoal ? contributeGoalAction : isBill ? payBillAction : payCycleAction}
               className="grid gap-3 border-t border-white/[.06] px-4 pb-4 pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
             >
               {isGoal ? (
                 <>
                   <input type="hidden" name="goalId" value={item.ref?.goalId} />
+                  <input type="hidden" name="period" value={item.ref?.period} />
+                </>
+              ) : isBill ? (
+                <>
+                  <input type="hidden" name="billId" value={item.ref?.billId} />
                   <input type="hidden" name="period" value={item.ref?.period} />
                 </>
               ) : item.direction === "in" ? (

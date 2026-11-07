@@ -10,3 +10,5 @@ export * from "./reminders";
 export * from "./messages";
 export * from "./goals";
 export * from "./health";
+export * from "./recurring";
+export * from "./shared";

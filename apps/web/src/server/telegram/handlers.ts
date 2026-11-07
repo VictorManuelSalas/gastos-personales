@@ -6,10 +6,11 @@ import {
   parseMessage,
   parsePaydayRule,
   parseSimulation,
+  addCooldown,
   quincenaFor,
   today,
 } from "@gp/core";
-import { category, contact, creditLine, cycle, db, goal, moneyAccount, telegramLinkToken, transaction, user, type Category } from "@gp/db";
+import { category, contact, creditLine, cycle, db, goal, moneyAccount, telegramLinkToken, transaction, user, wishlistItem, type Category } from "@gp/db";
 import { and, desc, eq, gt, gte, isNull, lte } from "drizzle-orm";
 import { fmtDay, fmtShort } from "@/lib/dates";
 import { newId } from "@/server/actions/util";
@@ -54,7 +55,8 @@ const HELP =
   "• <b>estado bbva 4568.71</b> — monto del estado de cuenta\n\n" +
   "• <b>/simula celular 9000 12 msi nu</b> — ¿me alcanza?\n" +
   "• <b>/viaje cancún</b> — todo lo que registres lleva #cancun (/viaje fin para terminar)\n" +
-  "• Agrega <b>#etiquetas</b> a cualquier gasto\n\n" +
+  "• Agrega <b>#etiquetas</b> a cualquier gasto\n" +
+  "• <b>/deseo audífonos 2500</b> — espera 72 h antes de comprar\n\n" +
   "/quincena · /pagos · /metas · /medeben · /deshacer";
 
 async function userByChat(chatId: number) {
@@ -245,6 +247,22 @@ export async function handleUpdate(update: Update) {
     );
   }
 
+  if (text.startsWith("/deseo")) {
+    const cards = await db.select().from(creditLine).where(and(eq(creditLine.userId, u.id), isNull(creditLine.archivedAt), eq(creditLine.kind, "card")));
+    const p = parseSimulation(text.replace(/^\/deseo/i, "/simula"), cards);
+    if (!p.priceCents) return sendMessage(chatId, "Escríbelo así: <b>/deseo audífonos 2500</b> (o <b>/deseo laptop 12000 12 msi nu</b>)");
+    await db.insert(wishlistItem).values({
+      id: newId(),
+      userId: u.id,
+      product: capitalize(originalWords(text, p.product)),
+      priceCents: p.priceCents,
+      months: p.months,
+      creditLineId: p.lineId,
+      availableAt: addCooldown(),
+    });
+    return sendMessage(chatId, `⏳ Guardé ${esc(capitalize(originalWords(text, p.product)))} (${formatMXN(p.priceCents)}). En 72 horas te pregunto si todavía lo quieres.`);
+  }
+
   if (text === "/ayuda" || text === "/help") return sendMessage(chatId, HELP);
 
   const [lines, accounts, goals] = await Promise.all([
@@ -400,6 +418,25 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>) {
     await answerCallback(cb.id, "Listo");
     if (cb.message) {
       await editMessageText(chatId, cb.message.message_id, `✓ <b>${formatMXN(t.amountCents)}</b> · ${cat.emoji} ${esc(cat.name)} · ${esc(t.merchant ?? "")}`, txnButtons(t.id));
+    }
+    return;
+  }
+
+  // Decisión sobre un deseo después de 72 h.
+  if (kind === "wish" && b) {
+    const status = b === "bought" ? "bought" : "dropped";
+    const [w] = await db
+      .update(wishlistItem)
+      .set({ status, decidedAt: new Date() })
+      .where(and(eq(wishlistItem.id, a), eq(wishlistItem.userId, u.id), eq(wishlistItem.status, "waiting")))
+      .returning();
+    await answerCallback(cb.id, w ? "Listo" : "Ya estaba decidido");
+    if (w && cb.message) {
+      await editMessageText(
+        chatId,
+        cb.message.message_id,
+        status === "dropped" ? `👏 Dejaste pasar ${esc(w.product)}: ${formatMXN(w.priceCents)} siguen en tu bolsa.` : `🛍️ Anotado: compraste ${esc(w.product)}.`,
+      );
     }
     return;
   }
