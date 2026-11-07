@@ -38,7 +38,7 @@ export const auth = betterAuth({
   appName: "Quincena",
   baseURL: appUrl,
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: [appUrl, "http://localhost:3100"],
+  trustedOrigins: [appUrl, "http://localhost:3100", "http://127.0.0.1:3100"],
   database: drizzleAdapter(db, {
     provider: "pg",
     schema: { user, session, account, verification },

@@ -4,21 +4,22 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Item = { href: string; label: string; icon: "home" | "invite" | "settings" };
+type Item = { href: string; label: string; icon: "home" | "card" | "list" | "more"; match?: string[] };
 
 const icons: Record<Item["icon"], React.ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1v-9.5Z" />,
-  invite: (
+  card: (
     <>
-      <path d="M15 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1" />
-      <circle cx="9" cy="7.5" r="3.5" />
-      <path d="M19 8v6M16 11h6" />
+      <rect x="2.5" y="5" width="19" height="14" rx="2.5" />
+      <path d="M2.5 10h19M6.5 15h4" />
     </>
   ),
-  settings: (
+  list: <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />,
+  more: (
     <>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+      <circle cx="5" cy="12" r="1.3" />
+      <circle cx="12" cy="12" r="1.3" />
+      <circle cx="19" cy="12" r="1.3" />
     </>
   ),
 };
@@ -31,15 +32,22 @@ function Icon({ name }: { name: Item["icon"] }) {
   );
 }
 
-function useItems(isAdmin: boolean): Item[] {
+function useItems(_isAdmin: boolean): Item[] {
   return [
     { href: "/app", label: "Inicio", icon: "home" },
-    ...(isAdmin ? [{ href: "/app/invitaciones", label: "Invitaciones", icon: "invite" as const }] : []),
-    { href: "/app/ajustes", label: "Ajustes", icon: "settings" },
+    { href: "/app/tarjetas", label: "Tarjetas", icon: "card" },
+    { href: "/app/movimientos", label: "Movimientos", icon: "list" },
+    {
+      href: "/app/mas",
+      label: "Más",
+      icon: "more",
+      match: ["/app/cuentas", "/app/ingresos", "/app/categorias", "/app/invitaciones", "/app/ajustes"],
+    },
   ];
 }
 
-const isActive = (pathname: string, href: string) => (href === "/app" ? pathname === "/app" : pathname.startsWith(href));
+const isActive = (pathname: string, it: Item) =>
+  it.href === "/app" ? pathname === "/app" : pathname.startsWith(it.href) || Boolean(it.match?.some((m) => pathname.startsWith(m)));
 
 /** Navegación superior (escritorio). */
 export function TopNav({ isAdmin }: { isAdmin: boolean }) {
@@ -47,7 +55,7 @@ export function TopNav({ isAdmin }: { isAdmin: boolean }) {
   return (
     <div className="hidden items-center gap-1 md:flex">
       {useItems(isAdmin).map((it) => {
-        const active = isActive(pathname, it.href);
+        const active = isActive(pathname, it);
         return (
           <Link
             key={it.href}
@@ -85,7 +93,7 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
     >
       <div className="glass mx-auto flex max-w-sm items-center justify-around rounded-full p-1.5">
         {items.map((it) => {
-          const active = isActive(pathname, it.href);
+          const active = isActive(pathname, it);
           return (
             <Link
               key={it.href}

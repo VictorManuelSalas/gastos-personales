@@ -57,3 +57,21 @@ export function formatShortDateTime(date: Date) {
     timeZone: TZ,
   }).format(date);
 }
+
+// Fechas ISO "YYYY-MM-DD" (sin zona) para mostrar en pantalla.
+const isoToDate = (s: string) => new Date(`${s}T12:00:00Z`);
+
+/** "17 nov" */
+export const fmtShort = (s: string) =>
+  new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short", timeZone: "UTC" }).format(isoToDate(s)).replace(".", "");
+
+/** "lun 17 nov" */
+export const fmtDay = (s: string) =>
+  new Intl.DateTimeFormat("es-MX", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })
+    .format(isoToDate(s))
+    .replace(/\./g, "")
+    .replace(",", "");
+
+/** "domingo 15 de noviembre" */
+export const fmtLong = (s: string) =>
+  new Intl.DateTimeFormat("es-MX", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(isoToDate(s)).replace(",", "");

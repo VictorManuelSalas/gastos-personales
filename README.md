@@ -6,7 +6,16 @@ App de finanzas personales para la familia: tarjetas, quincenas, metas y un bot 
 - Recomendaciones: [docs/RECOMENDACIONES.md](docs/RECOMENDACIONES.md)
 - Prototipo visual: [docs/diseno/prototipo.html](docs/diseno/prototipo.html)
 
-**Estado:** Fase 0 (base) lista: registro por invitación, inicio de sesión, PWA instalable y despliegue con Docker.
+**Estado:**
+- Fase 0 (base) lista: registro por invitación, inicio de sesión, PWA instalable y despliegue con Docker.
+- Fase 1, parte 1 lista: cuentas, tarjetas y préstamos con ciclos automáticos, Mis quincenas, MSI, ingresos esperados vs. reales, movimientos y categorías.
+- Pendiente de la Fase 1: importador del Excel, gestión completa de categorías y avisos por Telegram.
+
+Pruebas del núcleo (fechas, ciclos, quincenas, MSI):
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml run --rm --no-deps dev sh -c "corepack enable && pnpm --filter @gp/core test"
+```
 
 ## Requisitos
 

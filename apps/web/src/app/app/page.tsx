@@ -1,85 +1,155 @@
+import { diffDays, formatMXN } from "@gp/core";
 import type { Metadata } from "next";
+import Link from "next/link";
+import { FlowRow } from "@/components/finance/flow-row";
+import { toRows } from "@/components/finance/to-rows";
 import { InstallCard } from "@/components/install-card";
 import { GlassCard } from "@/components/ui/glass-card";
-import { formatLongDate, greeting, nextPayday } from "@/lib/dates";
+import { fmtLong, fmtShort, greeting } from "@/lib/dates";
 import { requireUser } from "@/lib/session";
+import { ensureDefaultCategories } from "@/server/finance/defaults";
+import { loadFinance } from "@/server/finance/overview";
 
-export const metadata: Metadata = { title: "Inicio" };
-
-const phases = [
-  { n: 0, name: "Base", body: "Cuentas por invitación, app instalable y servidor en casa.", state: "now" },
-  { n: 1, name: "Núcleo", body: "Tarjetas, ciclos, quincenas, MSI, categorías e importador del Excel.", state: "next" },
-  { n: 2, name: "Hábitos", body: "Bot de Telegram, metas, avisos, salud financiera y Me deben.", state: "later" },
-  { n: 3, name: "Extras", body: "Lista de deseos, espacios compartidos y patrimonio.", state: "later" },
-] as const;
+export const metadata: Metadata = { title: "Mis quincenas" };
 
 export default async function HomePage() {
   const { user } = await requireUser();
+  await ensureDefaultCategories(user.id);
+  const f = await loadFinance(user.id);
   const firstName = user.name.split(/\s+/)[0];
-  const pay = nextPayday();
-  const payLabel =
-    pay.daysUntil === 0 ? "Hoy es día de cobro" : pay.daysUntil === 1 ? "Mañana cobras" : `Faltan ${pay.daysUntil} días`;
+  const [current, ...upcoming] = f.quincenas;
+  const accounts = f.accounts.map((a) => ({ id: a.id, name: a.name, isDefault: a.isDefault }));
+
+  const setup = [
+    { done: f.accounts.length > 0, label: "Agrega tus cuentas y su saldo", href: "/app/cuentas" },
+    { done: f.lines.length > 0, label: "Registra tus tarjetas y préstamos", href: "/app/tarjetas" },
+    { done: f.sources.length > 0, label: "Agrega tus ingresos", href: "/app/ingresos" },
+  ];
+  const ready = setup.every((s) => s.done);
+  const nextIn = diffDays(f.now, current!.end) + 1;
 
   return (
     <div>
       <section>
-        <p className="eyebrow rise">{greeting()}</p>
-        <h1 className="rise d1 mt-5 text-[clamp(2.8rem,8vw,6rem)] font-semibold leading-[0.92] tracking-tighter">
-          <span className="chrome">Hola, {firstName}.</span>
-        </h1>
-        <p className="rise d2 mt-6 max-w-xl text-lg leading-relaxed text-mist">
-          La base está lista. En la siguiente fase aquí vivirá tu quincena: lo que entra, lo que se va y lo que te queda.
+        <p className="eyebrow rise">
+          {greeting()}, {firstName}
         </p>
+        <h1 className="rise d1 mt-5 text-[clamp(1.1rem,2vw,1.25rem)] font-medium text-mist">
+          Quincena del {fmtShort(current!.payday)} al {fmtShort(current!.end)}
+        </h1>
+        <p className="rise d1 mt-3 text-[clamp(3.4rem,11vw,7.5rem)] font-semibold leading-[0.9] tracking-tighter num">
+          <span className={current!.endCents < 0 ? "text-rose" : "chrome"}>{formatMXN(current!.endCents)}</span>
+        </p>
+        <p className="rise d2 mt-5 max-w-xl text-lg leading-relaxed text-mist">
+          {current!.endCents < 0
+            ? "Esta quincena no alcanza para todo lo pendiente. Revisa qué pago puedes mover."
+            : `Es lo que te queda después de lo pendiente. Faltan ${nextIn} ${nextIn === 1 ? "día" : "días"} para el próximo cobro.`}
+        </p>
+        <dl className="rise d3 mt-10 grid max-w-xl grid-cols-3 gap-6 border-t border-white/10 pt-6">
+          <div>
+            <dt className="eyebrow">Saldo hoy</dt>
+            <dd className="num mt-2 text-xl font-semibold tracking-tight">{formatMXN(current!.startCents, { round: true })}</dd>
+          </div>
+          <div>
+            <dt className="eyebrow">Por entrar</dt>
+            <dd className="num mt-2 text-xl font-semibold tracking-tight text-mint">{formatMXN(current!.inCents, { round: true })}</dd>
+          </div>
+          <div>
+            <dt className="eyebrow">Por pagar</dt>
+            <dd className="num mt-2 text-xl font-semibold tracking-tight">{formatMXN(current!.outCents, { round: true })}</dd>
+          </div>
+        </dl>
       </section>
 
-      <div className="mt-14 grid auto-rows-[minmax(200px,auto)] grid-cols-1 gap-4 md:grid-cols-6">
-        <GlassCard as="article" className="rise d2 p-7 md:col-span-4 md:p-9">
-          <p className="eyebrow">Próximo cobro</p>
-          <p className="num mt-5 text-[clamp(2.6rem,6vw,4.2rem)] font-semibold leading-none tracking-tighter chrome">
-            {payLabel}
-          </p>
-          <p className="mt-4 text-[15px] text-mist first-letter:uppercase">{formatLongDate(pay.date)}</p>
-          <p className="mt-8 max-w-md text-[14px] leading-relaxed text-haze">
-            Días de pago: el 15 y el último día de cada mes. En la Fase 1 cada tarjeta se acomodará sola en la quincena
-            que la paga.
-          </p>
+      {!ready ? (
+        <GlassCard interactive={false} className="rise d3 mt-12 p-7 md:p-9">
+          <p className="eyebrow">Para empezar</p>
+          <h2 className="mt-4 text-2xl font-semibold tracking-tight">Tres pasos y tu quincena se calcula sola.</h2>
+          <ol className="mt-6 grid gap-2">
+            {setup.map((s, i) => (
+              <li key={s.href}>
+                <Link
+                  href={s.href}
+                  className="flex items-center gap-4 rounded-2xl bg-white/[.03] px-4 py-3.5 ring-1 ring-white/[.06] transition-colors duration-300 hover:bg-white/[.06]"
+                >
+                  <span
+                    className={`grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono text-[12px] ${s.done ? "bg-mint/15 text-mint" : "bg-white/5 text-haze"}`}
+                  >
+                    {s.done ? "✓" : i + 1}
+                  </span>
+                  <span className={s.done ? "text-mist line-through decoration-white/20" : ""}>{s.label}</span>
+                  <span className="ml-auto text-haze" aria-hidden="true">
+                    →
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
         </GlassCard>
+      ) : null}
 
-        <div className="rise d3 md:col-span-2">
-          <InstallCard />
+      <section className="mt-14">
+        <div className="flex items-baseline justify-between">
+          <h2 className="eyebrow">Esta quincena</h2>
+          <span className="text-[12px] text-haze">hasta el {fmtLong(current!.end)}</span>
         </div>
+        {current!.items.length ? (
+          <ul className="mt-4 grid gap-2">
+            {toRows(current!.items, f.now).map((r) => (
+              <FlowRow key={r.id} item={r} accounts={accounts} today={f.now} />
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-4 text-[14px] text-mist">No hay pagos ni cobros pendientes en esta quincena.</p>
+        )}
+      </section>
 
-        <GlassCard as="article" className="rise d3 p-7 md:col-span-2">
+      <section className="mt-14">
+        <h2 className="eyebrow">Próximas quincenas</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {upcoming.map((q) => (
+            <GlassCard as="article" key={q.payday} className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[13px] text-mist">Cobro {fmtShort(q.payday)}</p>
+                  <p className={`num mt-2 text-[32px] font-semibold leading-none tracking-tighter ${q.endCents < 0 ? "text-rose" : ""}`}>
+                    {formatMXN(q.endCents, { round: true })}
+                  </p>
+                </div>
+                <div className="text-right text-[12px] text-haze num">
+                  <p className="text-mint">+{formatMXN(q.inCents, { round: true })}</p>
+                  <p className="mt-1">−{formatMXN(q.outCents, { round: true })}</p>
+                </div>
+              </div>
+              {q.items.filter((i) => i.direction === "out").length ? (
+                <ul className="mt-5 grid gap-1.5 text-[13px]">
+                  {q.items
+                    .filter((i) => i.direction === "out")
+                    .map((i) => (
+                      <li key={i.id} className="flex items-center gap-2.5">
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: i.ref?.color ?? "var(--color-glow)" }} />
+                        <span className="truncate text-mist">{i.label}</span>
+                        <span className="text-haze">· {fmtShort(i.date)}</span>
+                        <span className="num ml-auto">{formatMXN(i.amountCents, { round: true })}</span>
+                      </li>
+                    ))}
+                </ul>
+              ) : (
+                <p className="mt-5 text-[13px] text-haze">Sin pagos asignados.</p>
+              )}
+            </GlassCard>
+          ))}
+        </div>
+      </section>
+
+      <div className="mt-14 grid gap-4 md:grid-cols-2">
+        <InstallCard />
+        <GlassCard as="article" className="p-7">
           <p className="eyebrow">Telegram</p>
           <h3 className="mt-4 text-2xl font-semibold leading-tight tracking-tight">Escribe como hablas.</h3>
           <p className="mt-3 text-[14px] leading-relaxed text-mist">
             Pronto bastará con mandar <span className="font-mono text-ink">café 65 nu</span> para registrar un gasto.
           </p>
-          <p className="mt-6 text-[12px] text-haze">Llega en la Fase 2</p>
-        </GlassCard>
-
-        <GlassCard as="article" className="rise d4 p-7 md:col-span-4">
-          <p className="eyebrow">Fases</p>
-          <ol className="mt-5 grid gap-3 sm:grid-cols-2">
-            {phases.map((p) => (
-              <li
-                key={p.n}
-                className={`rounded-2xl p-4 ring-1 ${p.state === "now" ? "bg-glow/[.08] ring-glow/30" : "bg-white/[.03] ring-white/[.06]"}`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className={`font-mono text-[12px] ${p.state === "now" ? "text-glow" : "text-haze"}`}>
-                    Fase {p.n} · {p.name}
-                  </span>
-                  {p.state === "now" ? (
-                    <span className="rounded-full bg-glow/15 px-2 py-0.5 text-[10px] text-glow">En curso</span>
-                  ) : p.state === "next" ? (
-                    <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-haze">Siguiente</span>
-                  ) : null}
-                </div>
-                <p className="mt-2 text-[13px] leading-relaxed text-mist">{p.body}</p>
-              </li>
-            ))}
-          </ol>
         </GlassCard>
       </div>
     </div>

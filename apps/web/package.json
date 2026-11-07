@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@gp/core": "workspace:*",
     "@gp/db": "workspace:*",
     "better-auth": "^1.3.0",
     "drizzle-orm": "^0.45.2",

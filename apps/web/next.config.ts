@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Monorepo: el rastreo de archivos parte de la raíz para incluir packages/*
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  transpilePackages: ["@gp/db"],
+  transpilePackages: ["@gp/db", "@gp/core"],
   serverExternalPackages: ["pg"],
   poweredByHeader: false,
   async headers() {
