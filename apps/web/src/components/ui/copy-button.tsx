@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 
-export function CopyButton({ text }: { text: string }) {
+export function CopyButton({ text, label = "Copiar enlace", done = "Copiado" }: { text: string; label?: string; done?: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
@@ -12,7 +12,7 @@ export function CopyButton({ text }: { text: string }) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      window.prompt("Copia el enlace:", text);
+      window.prompt("Copia el texto:", text);
     }
   }
 
@@ -27,7 +27,7 @@ export function CopyButton({ text }: { text: string }) {
           transition={{ duration: 0.18 }}
           className={copied ? "text-mint" : undefined}
         >
-          {copied ? "Copiado" : "Copiar enlace"}
+          {copied ? done : label}
         </motion.span>
       </AnimatePresence>
     </button>

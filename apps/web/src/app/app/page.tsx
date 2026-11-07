@@ -47,7 +47,7 @@ export default async function HomePage() {
         </p>
         <dl className="rise d3 mt-10 grid max-w-xl grid-cols-3 gap-6 border-t border-white/10 pt-6">
           <div>
-            <dt className="eyebrow">Saldo hoy</dt>
+            <dt className="eyebrow">{f.reservedCents > 0 ? "Disponible hoy" : "Saldo hoy"}</dt>
             <dd className="num mt-2 text-xl font-semibold tracking-tight">{formatMXN(current!.startCents, { round: true })}</dd>
           </div>
           <div>
@@ -59,6 +59,11 @@ export default async function HomePage() {
             <dd className="num mt-2 text-xl font-semibold tracking-tight">{formatMXN(current!.outCents, { round: true })}</dd>
           </div>
         </dl>
+        {f.reservedCents > 0 ? (
+          <p className="rise d3 mt-4 text-[13px] text-haze num">
+            Tienes {formatMXN(f.reservedCents, { round: true })} apartados en metas; ya no cuentan como disponibles.
+          </p>
+        ) : null}
       </section>
 
       {!ready ? (
@@ -148,7 +153,7 @@ export default async function HomePage() {
           <p className="eyebrow">Telegram</p>
           <h3 className="mt-4 text-2xl font-semibold leading-tight tracking-tight">Escribe como hablas.</h3>
           <p className="mt-3 text-[14px] leading-relaxed text-mist">
-            Pronto bastará con mandar <span className="font-mono text-ink">café 65 nu</span> para registrar un gasto.
+            Manda <span className="font-mono text-ink">café 65 nu</span> al bot y queda registrado. Conéctalo en Más → Ajustes.
           </p>
         </GlassCard>
       </div>

@@ -1,18 +1,19 @@
 "use server";
 
 import { cyclesWithCutBetween, today } from "@gp/core";
-import { creditLine, cycle, db, installment } from "@gp/db";
+import { creditLine, cycle, db, installment, receivable, receivablePayment } from "@gp/db";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { parseWorkbook } from "@/server/import/excel";
 import { buildPlan, matchLine, type ImportPreview } from "@/server/import/plan";
+import { findOrCreateContact } from "@/server/finance/mutations";
 import { newId } from "./util";
 
 export type ImportState = {
   error: string | null;
   preview?: ImportPreview;
-  done?: { lines: number; cycles: number; installments: number };
+  done?: { lines: number; cycles: number; installments: number; debts: number };
   at?: number;
 };
 
@@ -61,7 +62,7 @@ export async function runImportAction(_p: ImportState, form: FormData): Promise<
   const existing = await existingLines(user.id);
   const plan = buildPlan(r.parsed, existing.map((l) => l.name));
   const now = today();
-  const counts = { lines: 0, cycles: 0, installments: 0 };
+  const counts = { lines: 0, cycles: 0, installments: 0, debts: 0 };
 
   await db.transaction(async (tx) => {
     const imported: { id: string; name: string; cutDay: number }[] = [];
@@ -146,6 +147,29 @@ export async function runImportAction(_p: ImportState, form: FormData): Promise<
       counts.installments++;
     }
   });
+
+  // Me deben: cada renglón es un préstamo; lo abonado se registra como un abono.
+  // No mueve saldos: ese dinero ya salió y regresó en el pasado.
+  for (const [index, d] of r.parsed.debts.entries()) {
+    if (form.get(`debt_${index}`) !== "on") continue;
+    const person = await findOrCreateContact(user.id, d.name);
+    const id = newId();
+    const paid = Math.min(d.paidCents, d.amountCents);
+    await db.insert(receivable).values({
+      id,
+      userId: user.id,
+      contactId: person!.id,
+      kind: "cash",
+      concept: d.concept,
+      amountCents: d.amountCents,
+      date: now,
+      status: paid >= d.amountCents ? "settled" : "active",
+    });
+    if (paid > 0) {
+      await db.insert(receivablePayment).values({ id: newId(), userId: user.id, receivableId: id, amountCents: paid, date: now });
+    }
+    counts.debts++;
+  }
 
   revalidatePath("/app", "layout");
   return { error: null, done: counts, at: Date.now() };

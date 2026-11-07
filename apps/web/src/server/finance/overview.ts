@@ -38,6 +38,7 @@ import {
   user,
 } from "@gp/db";
 import { and, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
+import { loadGoals } from "./goals";
 
 export const QUINCENAS_AHEAD = 6;
 
@@ -216,9 +217,36 @@ export async function loadFinance(userId: string, now = todayISO()) {
     }
   }
 
-  const quincenas: QuincenaBlock[] = projectQuincenas({ today: now, balanceCents, rule, items, count: QUINCENAS_AHEAD });
+  // Metas: lo apartado virtualmente no es dinero disponible (RN-13) y los aportes
+  // automáticos aparecen como renglón en cada quincena hasta llegar al objetivo.
+  const goals = await loadGoals(userId, rule, now);
+  const reservedCents = goals.filter((g) => g.virtual).reduce((s, g) => s + Math.max(0, g.savedCents), 0);
+  for (const g of goals) {
+    if (!g.autoCents || g.autoCents <= 0) continue;
+    let projected = g.savedCents;
+    const since = maxDate(currentPayday, todayISO(undefined, g.createdAt));
+    for (const d of paydaysBetween(rule, since, horizonEnd)) {
+      const done = g.movements.some((m) => m.periodDate === d);
+      if (!done && g.targetCents != null && projected >= g.targetCents) break;
+      if (!done) projected += g.autoCents;
+      items.push({
+        id: `g:${g.id}:${d}`,
+        kind: "goal",
+        label: `Apartar para ${g.name}`,
+        date: d,
+        payday: d,
+        amountCents: done ? (g.movements.find((m) => m.periodDate === d)?.amountCents ?? g.autoCents) : g.autoCents,
+        direction: "out",
+        status: done ? "done" : "pending",
+        ref: { goalId: g.id, period: d, color: "#6fe3b5" },
+      });
+    }
+  }
 
-  return { now, accounts, lines, installments, sources, cycleViews, balanceCents, quincenas, viewCycle, rule };
+  const availableCents = balanceCents - reservedCents;
+  const quincenas: QuincenaBlock[] = projectQuincenas({ today: now, balanceCents: availableCents, rule, items, count: QUINCENAS_AHEAD });
+
+  return { now, accounts, lines, installments, sources, cycleViews, balanceCents, reservedCents, availableCents, goals, quincenas, viewCycle, rule };
 }
 
 function monthlyDates(day: number, from: ISODate, to: ISODate): ISODate[] {

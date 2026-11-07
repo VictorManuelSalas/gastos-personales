@@ -11,6 +11,7 @@ export default async function MorePage() {
   const links = [
     { href: "/app/cuentas", title: "Cuentas", body: "Débito, efectivo y ahorro. Su saldo es tu punto de partida." },
     { href: "/app/ingresos", title: "Ingresos", body: "Sueldos y cobros fijos, con lo que esperas y lo que realmente cae." },
+    { href: "/app/me-deben", title: "Me deben", body: "Lo que prestaste y lo que te van abonando, persona por persona." },
     { href: "/app/importar", title: "Importar Excel", body: "Trae tus tarjetas, tu historial y tus compras a meses desde tu hoja." },
     { href: "/app/categorias", title: "Categorías", body: "En qué se va tu dinero. Crea, archiva y marca los antojos." },
     ...(user.role === "admin"

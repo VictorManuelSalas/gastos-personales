@@ -4,6 +4,7 @@ import { today } from "@gp/core";
 import { category, categoryRule, db, incomeSource, moneyAccount, transaction } from "@gp/db";
 import { and, eq, sql } from "drizzle-orm";
 import { learnCategory, normalizeMerchant, suggestCategory } from "@/server/finance/categorize";
+import { deleteTransaction, recordTransaction } from "@/server/finance/mutations";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import {
@@ -45,26 +46,16 @@ export async function createTxnAction(_p: ActionState, f: FormData): Promise<Act
   if (kind === "income" && !account) return fail("Los ingresos entran a una cuenta, no a una tarjeta.");
   if (cat && cat.kind !== kind) return fail("Esa categoría no corresponde al tipo de movimiento.");
 
-  await db.transaction(async (tx) => {
-    await tx.insert(transaction).values({
-      id: newId(),
-      userId: user.id,
-      kind,
-      amountCents: amount,
-      date,
-      categoryId: cat?.id ?? null,
-      accountId: account?.id ?? null,
-      creditLineId: line?.id ?? null,
-      merchant,
-      note: optStr(f, "note"),
-    });
-    if (account) {
-      const delta = kind === "income" ? amount : -amount;
-      await tx
-        .update(moneyAccount)
-        .set({ balanceCents: sql`${moneyAccount.balanceCents} + ${delta}` })
-        .where(eq(moneyAccount.id, account.id));
-    }
+  await recordTransaction({
+    userId: user.id,
+    kind,
+    amountCents: amount,
+    date,
+    categoryId: cat?.id ?? null,
+    accountId: account?.id ?? null,
+    creditLineId: line?.id ?? null,
+    merchant,
+    note: optStr(f, "note"),
   });
   // Si el usuario eligió la categoría a mano, se recuerda para ese comercio.
   if (merchant && cat && str(f, "categoryId")) await learnCategory(user.id, merchant, cat.id);
@@ -75,19 +66,7 @@ export async function createTxnAction(_p: ActionState, f: FormData): Promise<Act
 /** Borra un movimiento y revierte su efecto en la cuenta. */
 export async function deleteTxnAction(f: FormData) {
   const { user } = await requireUser();
-  const id = str(f, "id");
-  await db.transaction(async (tx) => {
-    const [t] = await tx.select().from(transaction).where(and(eq(transaction.id, id), eq(transaction.userId, user.id)));
-    if (!t || t.kind === "card_payment") return; // los pagos se deshacen desde la tarjeta
-    if (t.accountId) {
-      const delta = t.kind === "income" ? -t.amountCents : t.amountCents;
-      await tx
-        .update(moneyAccount)
-        .set({ balanceCents: sql`${moneyAccount.balanceCents} + ${delta}` })
-        .where(and(eq(moneyAccount.id, t.accountId), eq(moneyAccount.userId, user.id)));
-    }
-    await tx.delete(transaction).where(eq(transaction.id, t.id));
-  });
+  await deleteTransaction(user.id, str(f, "id"));
   revalidatePath("/app", "layout");
 }
 

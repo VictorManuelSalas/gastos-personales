@@ -28,13 +28,20 @@ async function call<T = unknown>(method: string, body: Record<string, unknown>):
   }
 }
 
-export function sendMessage(chatId: string | number, text: string, buttons?: Button[]) {
+/** Botones en una fila (Button[]) o en varias (Button[][]). */
+const keyboard = (buttons?: Button[] | Button[][]) => {
+  if (!buttons?.length) return undefined;
+  const rows = (Array.isArray(buttons[0]![0]) ? buttons : [buttons]) as Button[][];
+  return { inline_keyboard: rows.map((r) => r.map(([t, d]) => ({ text: t, callback_data: d }))) };
+};
+
+export function sendMessage(chatId: string | number, text: string, buttons?: Button[] | Button[][]) {
   return call("sendMessage", {
     chat_id: chatId,
     text,
     parse_mode: "HTML",
     link_preview_options: { is_disabled: true },
-    reply_markup: buttons?.length ? { inline_keyboard: [buttons.map(([t, d]) => ({ text: t, callback_data: d }))] } : undefined,
+    reply_markup: keyboard(buttons),
   });
 }
 
@@ -42,8 +49,8 @@ export function answerCallback(id: string, text?: string) {
   return call("answerCallbackQuery", { callback_query_id: id, text });
 }
 
-export function editMessageText(chatId: string | number, messageId: number, text: string) {
-  return call("editMessageText", { chat_id: chatId, message_id: messageId, text, parse_mode: "HTML" });
+export function editMessageText(chatId: string | number, messageId: number, text: string, buttons?: Button[] | Button[][]) {
+  return call("editMessageText", { chat_id: chatId, message_id: messageId, text, parse_mode: "HTML", reply_markup: keyboard(buttons) });
 }
 
 export function setWebhook(url: string, secret: string) {

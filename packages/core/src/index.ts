@@ -7,3 +7,5 @@ export * from "./money";
 export * from "./quincenas";
 export * from "./import";
 export * from "./reminders";
+export * from "./messages";
+export * from "./goals";

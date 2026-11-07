@@ -53,9 +53,12 @@ function findHeader(ws: ExcelJS.Worksheet, matchers: Record<string, (h: string) 
   return null;
 }
 
+export type SheetDebt = { name: string; concept: string; amountCents: number; paidCents: number };
+
 export type ParsedWorkbook = {
   rows: SheetRow[];
   installments: SheetInstallment[];
+  debts: SheetDebt[];
   monthSheets: string[];
   skippedSheets: string[];
 };
@@ -66,6 +69,7 @@ export async function parseWorkbook(data: ArrayBuffer): Promise<ParsedWorkbook> 
 
   const rows: SheetRow[] = [];
   const installments: SheetInstallment[] = [];
+  const debts: SheetDebt[] = [];
   const monthSheets: string[] = [];
   const skippedSheets: string[] = [];
 
@@ -143,8 +147,35 @@ export async function parseWorkbook(data: ArrayBuffer): Promise<ParsedWorkbook> 
       return;
     }
 
+    // Hoja de personas que deben (Name/Nombre, Amount/Monto, Item/Concepto, abonos).
+    const debt = findHeader(
+      ws,
+      {
+        name: (h) => ["name", "nombre", "persona", "quien"].includes(h),
+        amount: (h) => ["amount", "monto", "cantidad", "prestado"].includes(h),
+        concept: (h) => ["item", "concepto", "que", "motivo"].includes(h),
+        paid: (h) => ["minipayments", "abonos", "abonado", "pagado", "abono"].includes(h),
+      },
+      ["name", "amount", "concept"],
+    );
+    if (debt) {
+      for (let r = debt.row + 1; r <= ws.rowCount; r++) {
+        const row = ws.getRow(r);
+        const name = cellValue(row.getCell(debt.cols.name!).value);
+        const amountCents = toCents(cellValue(row.getCell(debt.cols.amount!).value));
+        if (typeof name !== "string" || !name.trim() || !amountCents || amountCents <= 0) continue;
+        debts.push({
+          name: name.trim(),
+          concept: String(cellValue(row.getCell(debt.cols.concept!).value) ?? "").trim() || "Préstamo",
+          amountCents,
+          paidCents: debt.cols.paid ? Math.max(0, toCents(cellValue(row.getCell(debt.cols.paid).value)) ?? 0) : 0,
+        });
+      }
+      return;
+    }
+
     skippedSheets.push(ws.name);
   });
 
-  return { rows, installments, monthSheets, skippedSheets };
+  return { rows, installments, debts, monthSheets, skippedSheets };
 }

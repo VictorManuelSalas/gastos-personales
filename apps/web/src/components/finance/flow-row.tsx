@@ -4,13 +4,14 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { payCycleAction } from "@/server/actions/cards";
+import { contributeGoalAction } from "@/server/actions/goals";
 import { confirmIncomeAction } from "@/server/actions/money";
 
 export type RowAccount = { id: string; name: string; isDefault: boolean };
 
 export type RowItem = {
   id: string;
-  kind: "income" | "card" | "loan";
+  kind: "income" | "card" | "loan" | "goal";
   label: string;
   dateLabel: string;
   amountLabel: string;
@@ -29,6 +30,7 @@ const ease = [0.16, 1, 0.3, 1] as const;
 
 export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: RowAccount[]; today: string }) {
   const [open, setOpen] = useState(false);
+  const isGoal = item.kind === "goal";
   const canAct = item.status === "pending" && (item.direction === "out" || item.confirmable);
   const defaultAccount = item.ref?.accountId || accounts.find((a) => a.isDefault)?.id || accounts[0]?.id || "";
 
@@ -46,7 +48,7 @@ export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: Ro
             {item.dateLabel}
             {item.overdue ? <span className="ml-2 text-rose">Vencido</span> : null}
             {item.status === "done" ? (
-              <span className="ml-2 text-mint">{item.direction === "in" ? "Cobrado" : "Pagado"}</span>
+              <span className="ml-2 text-mint">{item.direction === "in" ? "Cobrado" : isGoal ? "Apartado" : "Pagado"}</span>
             ) : item.estimated ? (
               <span className="ml-2">estimado</span>
             ) : null}
@@ -63,7 +65,7 @@ export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: Ro
             aria-expanded={open}
             className="btn btn-ghost shrink-0 rounded-full px-3 py-1.5 text-[12px]"
           >
-            {open ? "Cerrar" : item.direction === "in" ? "Confirmar" : "Pagar"}
+            {open ? "Cerrar" : item.direction === "in" ? "Confirmar" : isGoal ? "Apartar" : "Pagar"}
           </button>
         ) : null}
       </div>
@@ -78,10 +80,15 @@ export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: Ro
             className="overflow-hidden"
           >
             <ActionForm
-              action={item.direction === "in" ? confirmIncomeAction : payCycleAction}
+              action={item.direction === "in" ? confirmIncomeAction : isGoal ? contributeGoalAction : payCycleAction}
               className="grid gap-3 border-t border-white/[.06] px-4 pb-4 pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
             >
-              {item.direction === "in" ? (
+              {isGoal ? (
+                <>
+                  <input type="hidden" name="goalId" value={item.ref?.goalId} />
+                  <input type="hidden" name="period" value={item.ref?.period} />
+                </>
+              ) : item.direction === "in" ? (
                 <>
                   <input type="hidden" name="sourceId" value={item.ref?.sourceId} />
                   <input type="hidden" name="period" value={item.ref?.period} />
@@ -95,11 +102,11 @@ export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: Ro
               )}
               <div>
                 <label htmlFor={`amt-${item.id}`} className="block text-[12px] text-haze">
-                  {item.direction === "in" ? "¿Cuánto te cayó?" : "¿Cuánto pagaste?"}
+                  {item.direction === "in" ? "¿Cuánto te cayó?" : isGoal ? "¿Cuánto apartas?" : "¿Cuánto pagaste?"}
                 </label>
                 <input id={`amt-${item.id}`} name="amount" inputMode="decimal" defaultValue={item.amountInput} className="field num mt-1.5" />
               </div>
-              <div>
+              {isGoal ? <p className="self-center text-[12px] text-haze">Se queda en tu cuenta, separado del disponible.</p> : <div>
                 <label htmlFor={`acc-${item.id}`} className="block text-[12px] text-haze">
                   {item.direction === "in" ? "Entró a" : "Salió de"}
                 </label>
@@ -111,8 +118,8 @@ export function FlowRow({ item, accounts, today }: { item: RowItem; accounts: Ro
                     </option>
                   ))}
                 </select>
-              </div>
-              <SubmitButton>{item.direction === "in" ? "Confirmar" : "Marcar pagado"}</SubmitButton>
+              </div>}
+              <SubmitButton>{item.direction === "in" ? "Confirmar" : isGoal ? "Apartar" : "Marcar pagado"}</SubmitButton>
             </ActionForm>
           </motion.div>
         ) : null}

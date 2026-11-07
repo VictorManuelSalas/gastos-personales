@@ -71,7 +71,7 @@ export function remindersDue(input: {
       out.push({
         key: `${base}:cut`,
         kind: "cut",
-        text: `✂️ Cortó ${p.lineName}. ¿Cuánto dice tu estado de cuenta? Respóndeme con el monto, por ejemplo: <b>${p.lineName.split(" ")[0]} 4568.71</b>`,
+        text: `✂️ Cortó ${p.lineName}. ¿Cuánto dice tu estado de cuenta? Respóndeme así: <b>estado ${p.lineName} 4568.71</b>`,
       });
     }
     if (p.amountCents <= 0) continue;

@@ -4,7 +4,7 @@ import { upcomingPaydays, type PaydayRule } from "./paydays";
 /** Un renglón de la vista "Mis quincenas". */
 export type FlowItem = {
   id: string;
-  kind: "income" | "card" | "loan";
+  kind: "income" | "card" | "loan" | "goal";
   label: string;
   /** Fecha límite (pagos) o fecha de cobro (ingresos). */
   date: ISODate;

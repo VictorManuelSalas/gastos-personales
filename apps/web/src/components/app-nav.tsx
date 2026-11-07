@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Item = { href: string; label: string; icon: "home" | "card" | "list" | "more"; match?: string[] };
+type Item = { href: string; label: string; icon: "home" | "card" | "list" | "goal" | "more"; match?: string[] };
 
 const icons: Record<Item["icon"], React.ReactNode> = {
   home: <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1v-9.5Z" />,
@@ -15,6 +15,13 @@ const icons: Record<Item["icon"], React.ReactNode> = {
     </>
   ),
   list: <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />,
+  goal: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="1" />
+    </>
+  ),
   more: (
     <>
       <circle cx="5" cy="12" r="1.3" />
@@ -37,11 +44,12 @@ function useItems(_isAdmin: boolean): Item[] {
     { href: "/app", label: "Inicio", icon: "home" },
     { href: "/app/tarjetas", label: "Tarjetas", icon: "card" },
     { href: "/app/movimientos", label: "Movimientos", icon: "list" },
+    { href: "/app/metas", label: "Metas", icon: "goal" },
     {
       href: "/app/mas",
       label: "Más",
       icon: "more",
-      match: ["/app/cuentas", "/app/ingresos", "/app/categorias", "/app/importar", "/app/invitaciones", "/app/ajustes"],
+      match: ["/app/cuentas", "/app/ingresos", "/app/categorias", "/app/importar", "/app/me-deben", "/app/invitaciones", "/app/ajustes"],
     },
   ];
 }
@@ -91,7 +99,7 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
       }}
       aria-label="Principal"
     >
-      <div className="glass mx-auto flex max-w-sm items-center justify-around rounded-full p-1.5">
+      <div className="glass mx-auto flex max-w-md items-center justify-around rounded-full p-1.5">
         {items.map((it) => {
           const active = isActive(pathname, it);
           return (

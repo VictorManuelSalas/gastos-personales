@@ -6,7 +6,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { formatShortDateTime } from "@/lib/dates";
 import { requireAdmin } from "@/lib/session";
 import { revokeInvitationAction } from "./actions";
-import { CopyButton } from "./copy-button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { InviteForm } from "./invite-form";
 
 export const metadata: Metadata = { title: "Invitaciones" };

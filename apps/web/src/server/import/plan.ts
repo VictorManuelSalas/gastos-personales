@@ -17,6 +17,7 @@ export type ImportPreview = {
     existing: boolean;
   }[];
   installments: { index: number; product: string; bank: string; label: string; matched: string | null; done: boolean }[];
+  debts: { index: number; name: string; concept: string; label: string; settled: boolean }[];
 };
 
 const ruleLabel = (l: InferredLine) =>
@@ -70,6 +71,16 @@ export function buildPlan(parsed: ParsedWorkbook, existingNames: string[]) {
       matched: x.line?.name ?? null,
       done: x.inferred?.done ?? false,
     })),
+    debts: parsed.debts.map((d, index) => {
+      const pending = Math.max(0, d.amountCents - d.paidCents);
+      return {
+        index,
+        name: d.name,
+        concept: d.concept,
+        label: pending ? `${formatMXN(d.amountCents)} · abonado ${formatMXN(d.paidCents)} · falta ${formatMXN(pending)}` : `${formatMXN(d.amountCents)} · liquidado`,
+        settled: pending === 0,
+      };
+    }),
   };
 
   return { lines, installments, preview };

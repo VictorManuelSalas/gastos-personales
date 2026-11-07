@@ -36,7 +36,8 @@ export function ImportWizard() {
         <p className="eyebrow">Listo</p>
         <h2 className="mt-4 text-3xl font-semibold tracking-tight chrome">Tu historial ya está aquí.</h2>
         <p className="num mx-auto mt-4 max-w-md text-[15px] text-mist">
-          {result.done.lines} tarjetas y préstamos nuevos, {result.done.cycles} ciclos y {result.done.installments} compras a MSI.
+          {result.done.lines} tarjetas y préstamos nuevos, {result.done.cycles} ciclos, {result.done.installments} compras a MSI y{" "}
+          {result.done.debts} registros de Me deben.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Link href="/app" className="btn btn-primary rounded-full px-6 py-3 text-[14px]">
@@ -141,6 +142,24 @@ export function ImportWizard() {
                       <span className="text-[14px]">{i.product}</span>
                       <span className="ml-2 text-[12px] text-haze">{i.matched ?? `${i.bank}: no encontramos esa tarjeta`}</span>
                       <span className="mt-0.5 block text-[12px] text-haze">{i.done ? "Ya terminada, se omite" : i.label}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          {p.debts.length ? (
+            <section>
+              <h3 className="eyebrow">Me deben</h3>
+              <ul className="mt-3 grid gap-2">
+                {p.debts.map((d) => (
+                  <li key={d.index} className="flex flex-wrap items-center gap-3 rounded-2xl bg-white/[.03] p-4 ring-1 ring-white/[.06]">
+                    <input id={`debt_${d.index}`} name={`debt_${d.index}`} type="checkbox" defaultChecked className="h-4 w-4 accent-[#8fa8ff]" />
+                    <label htmlFor={`debt_${d.index}`} className="min-w-0 flex-1">
+                      <span className="text-[14px]">{d.name}</span>
+                      <span className="ml-2 text-[12px] text-haze">{d.concept}</span>
+                      <span className={`mt-0.5 block text-[12px] ${d.settled ? "text-haze" : "text-mist"}`}>{d.label}</span>
                     </label>
                   </li>
                 ))}

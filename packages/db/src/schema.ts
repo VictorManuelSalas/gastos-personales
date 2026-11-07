@@ -292,8 +292,110 @@ export const notification = pgTable(
   (t) => [uniqueIndex("notification_key_uq").on(t.key)],
 );
 
+// ── Metas (Fase 2, PRD 7.5) ───────────────────────────────────────────────────
+
+/** Meta de ahorro o fondo de emergencia. Lo ahorrado es la suma de sus movimientos. */
+export const goal = pgTable(
+  "goal",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    kind: text("kind").$type<"goal" | "emergency">().notNull().default("goal"),
+    name: text("name").notNull(),
+    emoji: text("emoji").notNull().default("🎯"),
+    /** Objetivo fijo. En el fondo de emergencia puede ser null y se calcula (RN-14). */
+    targetCents: cents("target_cents"),
+    targetDate: day("target_date"),
+    /** Meses de gastos esenciales que cubre el fondo de emergencia. */
+    emergencyMonths: integer("emergency_months"),
+    /** Cuenta real donde vive el dinero; null = apartado virtual (RN-13, RN-25). */
+    accountId: text("account_id").references(() => moneyAccount.id, { onDelete: "set null" }),
+    /** Aporte automático en cada día de cobro (aparece en Mis quincenas). */
+    autoCents: cents("auto_cents"),
+    archivedAt: ts("archived_at"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("goal_user_idx").on(t.userId)],
+);
+
+/** Aporte (+) o retiro (−) de una meta. */
+export const goalMovement = pgTable(
+  "goal_movement",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    goalId: text("goal_id")
+      .notNull()
+      .references(() => goal.id, { onDelete: "cascade" }),
+    amountCents: cents("amount_cents").notNull(),
+    date: day("date").notNull(),
+    /** Si fue el aporte automático de una quincena, su día de cobro. */
+    periodDate: day("period_date"),
+    note: text("note"),
+    origin: text("origin").$type<"web" | "telegram">().notNull().default("web"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("goal_movement_goal_idx").on(t.goalId)],
+);
+
+// ── Me deben (Fase 2, PRD 7.12) ───────────────────────────────────────────────
+
+export const contact = pgTable(
+  "contact",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    name: text("name").notNull(),
+    note: text("note"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("contact_user_idx").on(t.userId)],
+);
+
+/** Dinero prestado o compra hecha a nombre de otra persona. */
+export const receivable = pgTable(
+  "receivable",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    contactId: text("contact_id")
+      .notNull()
+      .references(() => contact.id, { onDelete: "cascade" }),
+    kind: text("kind").$type<"cash" | "purchase" | "paid_for">().notNull(),
+    concept: text("concept").notNull(),
+    amountCents: cents("amount_cents").notNull(),
+    date: day("date").notNull(),
+    accountId: text("account_id").references(() => moneyAccount.id, { onDelete: "set null" }),
+    creditLineId: text("credit_line_id").references(() => creditLine.id, { onDelete: "set null" }),
+    status: text("status").$type<"active" | "settled" | "forgiven">().notNull().default("active"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("receivable_user_idx").on(t.userId)],
+);
+
+export const receivablePayment = pgTable(
+  "receivable_payment",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    receivableId: text("receivable_id")
+      .notNull()
+      .references(() => receivable.id, { onDelete: "cascade" }),
+    amountCents: cents("amount_cents").notNull(),
+    date: day("date").notNull(),
+    accountId: text("account_id").references(() => moneyAccount.id, { onDelete: "set null" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("receivable_payment_idx").on(t.receivableId)],
+);
+
 export type User = typeof user.$inferSelect;
 export type Invitation = typeof invitation.$inferSelect;
+export type Goal = typeof goal.$inferSelect;
+export type GoalMovement = typeof goalMovement.$inferSelect;
+export type Contact = typeof contact.$inferSelect;
+export type Receivable = typeof receivable.$inferSelect;
+export type ReceivablePayment = typeof receivablePayment.$inferSelect;
 export type MoneyAccount = typeof moneyAccount.$inferSelect;
 export type CreditLine = typeof creditLine.$inferSelect;
 export type CycleRow = typeof cycle.$inferSelect;
