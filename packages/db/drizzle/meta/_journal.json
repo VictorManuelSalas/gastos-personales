@@ -50,6 +50,13 @@
       "when": 1794069736007,
       "tag": "0006_fair_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794070950381,
+      "tag": "0007_steep_giant_girl",
+      "breakpoints": true
     }
   ]
 }

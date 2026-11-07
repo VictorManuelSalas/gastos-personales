@@ -29,7 +29,7 @@ import {
 import { isPayable, loadFinance } from "@/server/finance/overview";
 import { simulatePurchase } from "@/server/finance/simulate";
 import { activeTravel, applyTags, extractHashtags, spentWithTag, startTravel, stopTravel } from "@/server/finance/tags";
-import { readReceipt } from "@/server/ai/receipt";
+import { FAILURE_TEXT, readReceipt, transcribe } from "@/server/ai/receipt";
 import { answerCallback, downloadFile, editMessageText, esc, sendMessage } from "./client";
 
 type Update = {
@@ -40,7 +40,8 @@ type Update = {
     from?: { first_name?: string };
     photo?: { file_id: string; width: number; height: number }[];
     document?: { file_id: string; mime_type?: string };
-    voice?: { file_id: string };
+    voice?: { file_id: string; mime_type?: string; duration?: number };
+    audio?: { file_id: string; mime_type?: string; duration?: number };
   };
   callback_query?: { id: string; data?: string; message?: { chat: { id: number }; message_id: number; text?: string } };
 };
@@ -111,14 +112,12 @@ const txnButtons = (id: string): [string, string][] => [
   ["Borrar", `del:${id}`],
 ];
 
-export async function handleUpdate(update: Update) {
+export async function handleUpdate(update: Update): Promise<unknown> {
   if (update.callback_query) return handleCallback(update.callback_query);
   const msg = update.message;
   if (!msg) return;
   if (msg.photo?.length || msg.document?.mime_type?.startsWith("image/")) return handlePhoto(msg);
-  if (msg.voice) {
-    return sendMessage(msg.chat.id, "Todavía no entiendo notas de voz. Escríbelo, por ejemplo: <b>tacos 180 nu</b>, o mándame la foto del ticket.");
-  }
+  if (msg.voice || msg.audio) return handleVoice(msg);
   if (!msg.text) return;
   const chatId = msg.chat.id;
   const text = msg.text.trim();
@@ -463,7 +462,7 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>) {
 
 
 /**
- * Foto de un ticket: Claude lee total, comercio y fecha, y se registra el gasto.
+ * Foto de un ticket: la IA del usuario (Gemini, OpenAI o Claude) lee total, comercio y fecha, y se registra el gasto.
  * El pie de foto puede indicar la tarjeta o cuenta ("nu", "efectivo") y #etiquetas.
  */
 async function handlePhoto(msg: NonNullable<Update["message"]>) {
@@ -478,16 +477,8 @@ async function handlePhoto(msg: NonNullable<Update["message"]>) {
   const mediaType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
 
   await sendMessage(chatId, "🧾 Leyendo tu ticket…");
-  const r = await readReceipt(file.data.toString("base64"), mediaType);
-  if (!r.ok) {
-    const why =
-      r.reason === "not_configured"
-        ? "La lectura de tickets no está activada en el servidor (falta ANTHROPIC_API_KEY)."
-        : r.reason === "unreadable"
-          ? "No pude leer el total. Toma la foto más de cerca, con buena luz, o escríbelo: <b>súper 450 nu</b>."
-          : "No pude procesar la foto. Escríbelo, por ejemplo: <b>súper 450 nu</b>.";
-    return sendMessage(chatId, why);
-  }
+  const r = await readReceipt(u.id, file.data.toString("base64"), mediaType);
+  if (!r.ok) return sendMessage(chatId, FAILURE_TEXT[r.reason]);
 
   const [lines, accounts] = await Promise.all([
     db.select().from(creditLine).where(and(eq(creditLine.userId, u.id), isNull(creditLine.archivedAt), eq(creditLine.kind, "card"))),
@@ -531,4 +522,26 @@ async function handlePhoto(msg: NonNullable<Update["message"]>) {
       (r.data.confidence !== "high" ? "\n⚠️ El total no se leía del todo claro; revísalo." : ""),
     txnButtons(id),
   );
+}
+
+/**
+ * Nota de voz: la IA del usuario la transcribe y el texto se procesa igual que si
+ * lo hubiera escrito ("tacos 180 nu"). Solo Gemini y OpenAI entienden audio.
+ */
+async function handleVoice(msg: NonNullable<Update["message"]>): Promise<unknown> {
+  const chatId = msg.chat.id;
+  const u = await userByChat(chatId);
+  if (!u) return sendMessage(chatId, "No reconozco este chat. Conéctalo desde Quincena → Más → Ajustes → Conectar Telegram.");
+  const media = msg.voice ?? msg.audio!;
+  if ((media.duration ?? 0) > 60) return sendMessage(chatId, "La nota es muy larga. Mándame algo corto, por ejemplo: «tacos ciento ochenta con nu».");
+
+  const file = await downloadFile(media.file_id);
+  if (!file) return sendMessage(chatId, "No pude descargar el audio. Intenta de nuevo.");
+  const mime = media.mime_type || (file.path.endsWith(".oga") || file.path.endsWith(".ogg") ? "audio/ogg" : "audio/mpeg");
+
+  const r = await transcribe(u.id, file.data, mime);
+  if (!r.ok) return sendMessage(chatId, FAILURE_TEXT[r.reason]);
+  const text = r.text.replace(/[.¡!¿?]+$/g, "").trim();
+  await sendMessage(chatId, `🎙️ Entendí: «${esc(text)}»`);
+  return handleUpdate({ message: { ...msg, voice: undefined, audio: undefined, text } } as Update);
 }

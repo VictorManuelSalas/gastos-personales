@@ -9,7 +9,7 @@ App de finanzas personales para la familia: tarjetas, quincenas, metas y un bot 
 **Estado:**
 - Fase 0 (base) lista: registro por invitación, inicio de sesión, PWA instalable y despliegue con Docker.
 - Fase 1 lista: cuentas, tarjetas y préstamos con ciclos automáticos, Mis quincenas, MSI, ingresos esperados vs. reales, movimientos, categorías (fusionar y reglas automáticas), importador del Excel, días de cobro configurables y avisos por Telegram.
-- Fase 2 lista: registrar todo escribiéndole al bot; metas y fondo de emergencia con apartados por quincena; Me deben; análisis con salud financiera, presupuestos y gráficas; simulador "¿Me alcanza?"; etiquetas y modo viaje; fotos de tickets leídas con Claude (requiere `ANTHROPIC_API_KEY`).
+- Fase 2 lista: registrar todo escribiéndole al bot; metas y fondo de emergencia con apartados por quincena; Me deben; análisis con salud financiera, presupuestos y gráficas; simulador "¿Me alcanza?"; etiquetas y modo viaje; fotos de tickets y notas de voz leídas con IA (ver *Inteligencia artificial*).
 - Fase 3 lista: servicios y suscripciones (vencimientos, avisos, gastos divididos y detector automático), lista de deseos con 72 h de espera, patrimonio neto, reporte anual, exportación a Excel, espacios compartidos (quién le debe a quién y metas en común) y proyectos/negocios (clientes, cobros, costos y retorno).
 - Fase 4 lista (pendientes del PRD): bandeja de avisos con contador, notificaciones push en Android (PWA), resúmenes semanal y mensual, hitos y metas en riesgo, MSI por terminar, gasto inusual, uso alto de crédito, recordatorio de registro (opcional), fondos de previsión anuales, movimientos divididos, subcategorías y cierre de quincena.
 - Notas de voz: pendiente; la API de Claude no transcribe audio, se necesita un servicio de transcripción (p. ej. Whisper).
@@ -90,6 +90,20 @@ TELEGRAM_WEBHOOK_SECRET=un-texto-largo-al-azar
 5. Cada persona: **Más → Ajustes → Conectar Telegram**.
 
 Los avisos se revisan cada 10 minutos: días antes de la fecha límite (configurable), el día del corte, el día de cobro y si un pago quedó vencido. Nunca se envía el mismo aviso dos veces ni en horario de silencio.
+
+## Inteligencia artificial (tickets y notas de voz)
+
+El bot lee fotos de tickets y, con Gemini u OpenAI, también notas de voz ("tacos 180 nu").
+
+- **Cada usuario puede usar su propia cuenta:** Más → Ajustes → Inteligencia artificial. Elige Gemini, OpenAI o Claude, pega su API key y la app la valida con el proveedor. Se guarda cifrada (AES-256-GCM) y solo se muestran sus últimos 4 caracteres.
+- **Llave del servidor (opcional):** si un usuario no tiene llave propia se usa la del `.env` (`GEMINI_API_KEY`, `OPENAI_API_KEY` o `ANTHROPIC_API_KEY`; `AI_PROVIDER` elige cuál por defecto).
+- `APP_ENCRYPTION_KEY` cifra las llaves de los usuarios (si falta se usa `BETTER_AUTH_SECRET`). Si la cambias, cada quien debe capturar su llave de nuevo.
+
+| Proveedor | Tickets | Voz | Modelo por defecto |
+|---|---|---|---|
+| Google Gemini | ✓ | ✓ | `gemini-2.5-flash` |
+| OpenAI | ✓ | ✓ (Whisper) | `gpt-4o-mini` |
+| Claude | ✓ | — | `claude-opus-5-5` |
 
 ## Notificaciones push (Android)
 

@@ -656,6 +656,21 @@ export const quincenaClose = pgTable(
   (t) => [uniqueIndex("quincena_close_uq").on(t.userId, t.payday)],
 );
 
+/**
+ * IA de cada usuario (traer tu propia llave). La llave se guarda cifrada con
+ * AES-256-GCM; solo se muestran sus últimos 4 caracteres.
+ */
+export const userAiSetting = pgTable("user_ai_setting", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  provider: text("provider").$type<"gemini" | "openai" | "anthropic">().notNull(),
+  model: text("model"),
+  encryptedKey: text("encrypted_key"),
+  keyHint: text("key_hint"),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
 export type WishlistItem = typeof wishlistItem.$inferSelect;
 export type RecurringBill = typeof recurringBill.$inferSelect;
 export type Space = typeof space.$inferSelect;

@@ -21,3 +21,6 @@ coverage/
 .pnpm-store/
 *.tsbuildinfo
 .tmp-import/
+
+# Copias de conflicto de iCloud ("archivo 2.ts")
+* 2.*

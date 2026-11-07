@@ -12,3 +12,4 @@ export * from "./goals";
 export * from "./health";
 export * from "./recurring";
 export * from "./shared";
+export * from "./ai";

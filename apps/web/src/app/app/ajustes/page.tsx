@@ -19,6 +19,12 @@ import { telegramConfig } from "@/server/telegram/client";
 import { PushToggle } from "@/components/push-toggle";
 import { updateNotifPrefsAction } from "@/server/actions/notifications";
 import { pushConfig } from "@/server/notify/push";
+import { AiSettingsForm } from "@/components/ai-settings-form";
+import { serverAi } from "@/server/ai/receipt";
+import { userAiSetting } from "@gp/db";
+import type { AiProvider } from "@gp/core";
+
+const SERVER_KEY_ENV: Record<AiProvider, string> = { gemini: "GEMINI_API_KEY", openai: "OPENAI_API_KEY", anthropic: "ANTHROPIC_API_KEY" };
 
 export const metadata: Metadata = { title: "Ajustes" };
 
@@ -26,7 +32,10 @@ const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
 export default async function SettingsPage() {
   const { user: session } = await requireUser();
-  const [u] = await db.select().from(userTable).where(eq(userTable.id, session.id));
+  const [[u], [ai]] = await Promise.all([
+    db.select().from(userTable).where(eq(userTable.id, session.id)),
+    db.select().from(userAiSetting).where(eq(userAiSetting.userId, session.id)),
+  ]);
   const rule = parsePaydayRule(u!.payDays, u!.paydayPolicy) ?? DEFAULT_PAYDAYS;
   const tg = telegramConfig();
   const linked = Boolean(u!.telegramChatId);
@@ -180,6 +189,17 @@ export default async function SettingsPage() {
               <SubmitButton variant="ghost">Guardar</SubmitButton>
             </div>
           </ActionForm>
+        </GlassCard>
+      </section>
+
+      <section className="mt-12">
+        <h2 className="eyebrow">Inteligencia artificial</h2>
+        <GlassCard interactive={false} className="mt-4 p-6 md:p-8">
+          <AiSettingsForm
+            current={ai ? { provider: ai.provider, model: ai.model, keyHint: ai.keyHint } : null}
+            server={serverAi()?.provider ?? null}
+            serverKeys={(["gemini", "openai", "anthropic"] as AiProvider[]).filter((p) => !!process.env[SERVER_KEY_ENV[p]])}
+          />
         </GlassCard>
       </section>
 
