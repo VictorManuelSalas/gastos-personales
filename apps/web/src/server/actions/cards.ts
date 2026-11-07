@@ -6,6 +6,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
+import { markCyclePaid } from "@/server/finance/mutations";
 import { fail, int, isoDate, money, newId, ok, optMoney, ownAccount, ownLine, str, type ActionState } from "./util";
 
 const COLORS = ["#8fa8ff", "#6fe3b5", "#f3c46b", "#ff8a8a", "#c49bff", "#5fd0f3", "#f39bd0", "#c9ccd8"];
@@ -121,29 +122,7 @@ export async function payCycleAction(_p: ActionState, f: FormData): Promise<Acti
   if (!line || !cut) return fail("No encontramos ese ciclo.");
   if (amount == null) return fail("Escribe cuánto pagaste.");
 
-  await db.transaction(async (tx) => {
-    await tx
-      .insert(cycle)
-      .values({ id: newId(), userId: user.id, creditLineId: line.id, cutDate: cut, paidAt, paidCents: amount })
-      .onConflictDoUpdate({ target: [cycle.creditLineId, cycle.cutDate], set: { paidAt, paidCents: amount, updatedAt: new Date() } });
-    await tx.insert(transaction).values({
-      id: newId(),
-      userId: user.id,
-      kind: "card_payment",
-      amountCents: amount,
-      date: paidAt,
-      accountId: account?.id ?? null,
-      creditLineId: line.id,
-      periodDate: cut,
-      note: `Pago ${line.name}`,
-    });
-    if (account) {
-      await tx
-        .update(moneyAccount)
-        .set({ balanceCents: sql`${moneyAccount.balanceCents} - ${amount}` })
-        .where(eq(moneyAccount.id, account.id));
-    }
-  });
+  await markCyclePaid({ userId: user.id, line, cut, amountCents: amount, accountId: account?.id ?? null, paidAt });
   revalidatePath("/app", "layout");
   return ok();
 }

@@ -10,6 +10,7 @@ import {
   monthIndex,
   monthStart,
   parse,
+  parsePaydayRule,
   paydaysBetween,
   projectQuincenas,
   today as todayISO,
@@ -19,6 +20,7 @@ import {
   type FlowItem,
   type Installment,
   type ISODate,
+  type PendingPayment,
   type QuincenaBlock,
 } from "@gp/core";
 import {
@@ -33,6 +35,7 @@ import {
   type CycleRow,
   type IncomeSource,
   type InstallmentRow,
+  user,
 } from "@gp/db";
 import { and, desc, eq, gte, isNotNull, isNull } from "drizzle-orm";
 
@@ -68,7 +71,8 @@ export type CycleView = Cycle & {
 /** Todo lo que necesitan las vistas de un usuario, cargado en una sola pasada. */
 export async function loadFinance(userId: string, now = todayISO()) {
   const since = monthStart(now, -8);
-  const [accounts, lines, cycleRows, installments, sources, incomes, expenses] = await Promise.all([
+  const [[prefs], accounts, lines, cycleRows, installments, sources, incomes, expenses] = await Promise.all([
+    db.select({ payDays: user.payDays, policy: user.paydayPolicy }).from(user).where(eq(user.id, userId)),
     db.select().from(moneyAccount).where(and(eq(moneyAccount.userId, userId), isNull(moneyAccount.archivedAt))).orderBy(moneyAccount.createdAt),
     db.select().from(creditLine).where(and(eq(creditLine.userId, userId), isNull(creditLine.archivedAt))).orderBy(creditLine.createdAt),
     db.select().from(cycle).where(eq(cycle.userId, userId)),
@@ -85,7 +89,7 @@ export async function loadFinance(userId: string, now = todayISO()) {
       .where(and(eq(transaction.userId, userId), eq(transaction.kind, "expense"), isNotNull(transaction.creditLineId), gte(transaction.date, since))),
   ]);
 
-  const rule = DEFAULT_PAYDAYS;
+  const rule = (prefs && parsePaydayRule(prefs.payDays, prefs.policy)) ?? DEFAULT_PAYDAYS;
   const balanceCents = accounts.filter((a) => a.inAvailable).reduce((s, a) => s + a.balanceCents, 0);
   const paydays = upcomingPaydays(rule, now, QUINCENAS_AHEAD + 1);
   const horizonEnd = paydays[paydays.length - 1]!;
@@ -165,7 +169,7 @@ export async function loadFinance(userId: string, now = todayISO()) {
 
   const items: FlowItem[] = [];
   for (const cv of cycleViews) {
-    if (cv.amountCents <= 0 && cv.status !== "paid") continue;
+    if (cv.amountCents <= 0) continue;
     const line = lines.find((l) => l.id === cv.lineId)!;
     items.push({
       id: `c:${cv.lineId}:${cv.cut}`,
@@ -256,3 +260,37 @@ export function cardSummaries(f: Awaited<ReturnType<typeof loadFinance>>) {
 export { toInstallment };
 export type Finance = Awaited<ReturnType<typeof loadFinance>>;
 export type { CreditLine, IncomeSource };
+
+/** ¿Este ciclo es un pago por hacer? (cortado, vencido, cortó hoy con estado de cuenta, o mensualidad de préstamo). */
+export function isPayable(cv: CycleView, kind: "card" | "loan") {
+  if (cv.status === "paid" || cv.amountCents <= 0) return false;
+  return (
+    cv.status === "cut" ||
+    cv.status === "overdue" ||
+    (cv.status === "open" && cv.source === "statement") ||
+    (kind === "loan" && (cv.status === "open" || cv.status === "upcoming"))
+  );
+}
+
+/** Pagos pendientes para los avisos de Telegram. */
+export function pendingPayments(f: Finance): PendingPayment[] {
+  const out: PendingPayment[] = [];
+  for (const cv of f.cycleViews) {
+    const line = f.lines.find((l) => l.id === cv.lineId);
+    if (!line) continue;
+    const payable = isPayable(cv, line.kind);
+    const needsStatement = line.kind === "card" && cv.cut === f.now && cv.row?.statementCents == null;
+    if (!payable && !needsStatement) continue;
+    out.push({
+      lineId: line.id,
+      lineName: line.name,
+      kind: line.kind,
+      cut: cv.cut,
+      due: cv.due,
+      payday: cv.payday,
+      amountCents: payable ? cv.amountCents : 0,
+      needsStatement,
+    });
+  }
+  return out;
+}

@@ -8,8 +8,7 @@ App de finanzas personales para la familia: tarjetas, quincenas, metas y un bot 
 
 **Estado:**
 - Fase 0 (base) lista: registro por invitación, inicio de sesión, PWA instalable y despliegue con Docker.
-- Fase 1, parte 1 lista: cuentas, tarjetas y préstamos con ciclos automáticos, Mis quincenas, MSI, ingresos esperados vs. reales, movimientos y categorías.
-- Pendiente de la Fase 1: importador del Excel, gestión completa de categorías y avisos por Telegram.
+- Fase 1 lista: cuentas, tarjetas y préstamos con ciclos automáticos, Mis quincenas, MSI, ingresos esperados vs. reales, movimientos, categorías (fusionar y reglas automáticas), importador del Excel, días de cobro configurables y avisos por Telegram.
 
 Pruebas del núcleo (fechas, ciclos, quincenas, MSI):
 
@@ -71,10 +70,32 @@ docker compose --profile tunnel up -d --build
 
 4. Abre el dominio en Chrome (Android) y toca **Instalar app**.
 
+## Bot de Telegram (avisos de fecha límite)
+
+1. En Telegram, habla con **@BotFather** → `/newbot` → elige nombre y usuario (p. ej. `QuincenaCasaBot`). Te da un token.
+2. En `.env` agrega:
+
+```
+TELEGRAM_BOT_TOKEN=el-token-de-botfather
+TELEGRAM_BOT_USERNAME=QuincenaCasaBot
+TELEGRAM_WEBHOOK_SECRET=un-texto-largo-al-azar
+```
+
+3. Reinicia la app (`docker compose up -d --build`). Necesita estar publicada con HTTPS (ver la sección del túnel).
+4. Como administrador: **Más → Ajustes → Registrar webhook**.
+5. Cada persona: **Más → Ajustes → Conectar Telegram**.
+
+Los avisos se revisan cada 10 minutos: días antes de la fecha límite (configurable), el día del corte, el día de cobro y si un pago quedó vencido. Nunca se envía el mismo aviso dos veces ni en horario de silencio.
+
+## Importar tu Excel
+
+**Más → Importar Excel**. Acepta el formato de pestañas mensuales (Tarjeta de crédito, Cantidad, Fecha de corte, Fecha límite de pago, Pagado) y la hoja de compras a meses (Producto, Banco, Precio, Meses a pagar, Meses abonados). La regla de cada tarjeta se deduce de tus últimos 6 meses. Puedes revisar todo antes de importar.
+
 ## Estructura
 
 ```
-apps/web        Next.js 15 (UI, API, auth, PWA)
+apps/web        Next.js 15 (UI, API, auth, PWA, webhook de Telegram, avisos)
+packages/core   Lógica pura: fechas, ciclos, quincenas, MSI, importador, avisos (con pruebas)
 packages/db     Esquema Drizzle + migraciones SQL
 docs/           PRD, recomendaciones, prototipo (docs/privado no se sube)
 ```

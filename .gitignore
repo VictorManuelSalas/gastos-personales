@@ -20,3 +20,4 @@ coverage/
 # pnpm (store creado dentro de Docker)
 .pnpm-store/
 *.tsbuildinfo
+.tmp-import/

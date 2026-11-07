@@ -22,7 +22,7 @@ export default async function HomePage() {
 
   const setup = [
     { done: f.accounts.length > 0, label: "Agrega tus cuentas y su saldo", href: "/app/cuentas" },
-    { done: f.lines.length > 0, label: "Registra tus tarjetas y préstamos", href: "/app/tarjetas" },
+    { done: f.lines.length > 0, label: "Registra tus tarjetas o importa tu Excel", href: f.lines.length ? "/app/tarjetas" : "/app/importar" },
     { done: f.sources.length > 0, label: "Agrega tus ingresos", href: "/app/ingresos" },
   ];
   const ready = setup.every((s) => s.done);

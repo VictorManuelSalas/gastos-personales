@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: { serverActions: { bodySizeLimit: "6mb" } },
   // Monorepo: el rastreo de archivos parte de la raíz para incluir packages/*
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@gp/db", "@gp/core"],

@@ -1,8 +1,9 @@
 "use server";
 
 import { today } from "@gp/core";
-import { category, db, incomeSource, moneyAccount, transaction } from "@gp/db";
+import { category, categoryRule, db, incomeSource, moneyAccount, transaction } from "@gp/db";
 import { and, eq, sql } from "drizzle-orm";
+import { learnCategory, normalizeMerchant, suggestCategory } from "@/server/finance/categorize";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import {
@@ -32,8 +33,11 @@ export async function createTxnAction(_p: ActionState, f: FormData): Promise<Act
   const amount = money(f, "amount");
   const date = isoDate(f, "date") ?? today();
   const [srcType, srcId] = str(f, "source").split(":");
-  const cat = await ownCategory(user.id, str(f, "categoryId") || null);
+  const merchant = optStr(f, "merchant");
+  let cat = await ownCategory(user.id, str(f, "categoryId") || null);
   if (amount == null) return fail("Escribe el monto, por ejemplo 65 o 1250.50.");
+  // RN-19: sin categoría elegida, se usa la regla o lo aprendido para ese comercio.
+  if (!cat && merchant) cat = await suggestCategory(user.id, merchant, kind);
 
   const account = srcType === "a" ? await ownAccount(user.id, srcId ?? null) : null;
   const line = srcType === "c" ? await ownLine(user.id, srcId ?? null) : null;
@@ -51,7 +55,7 @@ export async function createTxnAction(_p: ActionState, f: FormData): Promise<Act
       categoryId: cat?.id ?? null,
       accountId: account?.id ?? null,
       creditLineId: line?.id ?? null,
-      merchant: optStr(f, "merchant"),
+      merchant,
       note: optStr(f, "note"),
     });
     if (account) {
@@ -62,6 +66,8 @@ export async function createTxnAction(_p: ActionState, f: FormData): Promise<Act
         .where(eq(moneyAccount.id, account.id));
     }
   });
+  // Si el usuario eligió la categoría a mano, se recuerda para ese comercio.
+  if (merchant && cat && str(f, "categoryId")) await learnCategory(user.id, merchant, cat.id);
   revalidatePath("/app", "layout");
   return ok();
 }
@@ -200,4 +206,45 @@ export async function restoreCategoryAction(f: FormData) {
     .set({ archivedAt: null })
     .where(and(eq(category.id, str(f, "id")), eq(category.userId, user.id)));
   revalidatePath("/app", "layout");
+}
+
+/** RN-18: fusiona una categoría en otra; sus movimientos y reglas pasan a la destino. */
+export async function mergeCategoryAction(_p: ActionState, f: FormData): Promise<ActionState> {
+  const { user } = await requireUser();
+  const source = await ownCategory(user.id, str(f, "sourceId") || null);
+  const target = await ownCategory(user.id, str(f, "targetId") || null);
+  if (!source || !target) return fail("Elige las dos categorías.");
+  if (source.id === target.id) return fail("Elige dos categorías distintas.");
+  if (source.kind !== target.kind) return fail("Solo se pueden fusionar categorías del mismo tipo.");
+  await db.transaction(async (tx) => {
+    await tx.update(transaction).set({ categoryId: target.id }).where(and(eq(transaction.userId, user.id), eq(transaction.categoryId, source.id)));
+    await tx
+      .update(categoryRule)
+      .set({ categoryId: target.id })
+      .where(and(eq(categoryRule.userId, user.id), eq(categoryRule.categoryId, source.id)));
+    await tx.update(category).set({ parentId: target.id }).where(and(eq(category.userId, user.id), eq(category.parentId, source.id)));
+    await tx.delete(category).where(and(eq(category.id, source.id), eq(category.userId, user.id)));
+  });
+  revalidatePath("/app", "layout");
+  return ok();
+}
+
+export async function createRuleAction(_p: ActionState, f: FormData): Promise<ActionState> {
+  const { user } = await requireUser();
+  const cat = await ownCategory(user.id, str(f, "categoryId") || null);
+  const pattern = normalizeMerchant(str(f, "pattern"));
+  if (pattern.length < 2) return fail("Escribe al menos 2 letras del comercio, por ejemplo oxxo.");
+  if (!cat) return fail("Elige la categoría.");
+  await db
+    .insert(categoryRule)
+    .values({ id: newId(), userId: user.id, pattern, categoryId: cat.id, origin: "manual" })
+    .onConflictDoUpdate({ target: [categoryRule.userId, categoryRule.pattern], set: { categoryId: cat.id, origin: "manual" } });
+  revalidatePath("/app/categorias");
+  return ok();
+}
+
+export async function deleteRuleAction(f: FormData) {
+  const { user } = await requireUser();
+  await db.delete(categoryRule).where(and(eq(categoryRule.id, str(f, "id")), eq(categoryRule.userId, user.id)));
+  revalidatePath("/app/categorias");
 }

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   assignPayday,
+  describePaydays,
+  parsePaydayRule,
   bankHolidays,
   cycleContaining,
   cycleForCut,
@@ -199,5 +201,15 @@ describe("dinero (RN-11)", () => {
 
   it("formatea en pesos", () => {
     expect(formatMXN(456_871)).toBe("$4,568.71");
+  });
+});
+
+describe("días de cobro configurables", () => {
+  it("lee y describe la regla", () => {
+    expect(parsePaydayRule("15, último")).toEqual({ days: [15, "last"], policy: "none" });
+    expect(parsePaydayRule("10 25", "previous_business")).toEqual({ days: [10, 25], policy: "previous_business" });
+    expect(parsePaydayRule("40")).toBeNull();
+    expect(parsePaydayRule("")).toBeNull();
+    expect(describePaydays({ days: [15, "last"], policy: "none" })).toBe("15 y último día del mes");
   });
 });

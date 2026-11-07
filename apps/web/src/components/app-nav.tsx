@@ -41,7 +41,7 @@ function useItems(_isAdmin: boolean): Item[] {
       href: "/app/mas",
       label: "Más",
       icon: "more",
-      match: ["/app/cuentas", "/app/ingresos", "/app/categorias", "/app/invitaciones", "/app/ajustes"],
+      match: ["/app/cuentas", "/app/ingresos", "/app/categorias", "/app/importar", "/app/invitaciones", "/app/ajustes"],
     },
   ];
 }

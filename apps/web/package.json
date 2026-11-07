@@ -13,6 +13,7 @@
     "@gp/db": "workspace:*",
     "better-auth": "^1.3.0",
     "drizzle-orm": "^0.45.2",
+    "exceljs": "^4.4.0",
     "motion": "^12.23.0",
     "next": "^15.5.0",
     "pg": "^8.16.0",

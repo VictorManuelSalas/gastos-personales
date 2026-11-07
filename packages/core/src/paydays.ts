@@ -58,3 +58,29 @@ export function upcomingPaydays(rule: PaydayRule, today: ISODate, count: number)
   while (out.length < count) out.push(paydayAfter(rule, out[out.length - 1]!));
   return out;
 }
+
+/** "15,last" → regla. Acepta "ultimo"/"último" como sinónimo de "last". Null si es inválido. */
+export function parsePaydayRule(days: string, policy: string = "none"): PaydayRule | null {
+  const parts = days
+    .split(/[,\s]+/)
+    .map((p) => p.trim().toLowerCase())
+    .filter(Boolean);
+  if (!parts.length || parts.length > 4) return null;
+  const out: (number | "last")[] = [];
+  for (const p of parts) {
+    if (["last", "ultimo", "último"].includes(p)) out.push("last");
+    else if (/^\d{1,2}$/.test(p) && Number(p) >= 1 && Number(p) <= 31) out.push(Number(p));
+    else return null;
+  }
+  return { days: [...new Set(out)], policy: policy === "previous_business" ? "previous_business" : "none" };
+}
+
+/** Regla → "15,last" para guardar. */
+export const serializePaydays = (r: PaydayRule) => r.days.join(",");
+
+/** "15 y último día del mes" */
+export function describePaydays(r: PaydayRule): string {
+  const labels = r.days.map((d) => (d === "last" ? "último día del mes" : String(d)));
+  const text = labels.length > 1 ? `${labels.slice(0, -1).join(", ")} y ${labels[labels.length - 1]}` : labels[0]!;
+  return r.policy === "previous_business" ? `${text} (se adelanta si es inhábil)` : text;
+}

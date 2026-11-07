@@ -15,6 +15,13 @@
       "when": 1794035777546,
       "tag": "0001_steep_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794037234918,
+      "tag": "0002_wise_titanium_man",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,16 @@ export const user = pgTable("user", {
   image: text("image"),
   /** "admin" | "user". El primer usuario registrado es admin. */
   role: text("role").notNull().default("user"),
+  // Preferencias (RN-03, 7.11). Se leen directo de la BD, no viajan en la sesión.
+  /** Días de cobro separados por coma; "last" = último día del mes. */
+  payDays: text("pay_days").notNull().default("15,last"),
+  paydayPolicy: text("payday_policy").$type<"none" | "previous_business">().notNull().default("none"),
+  telegramChatId: text("telegram_chat_id"),
+  telegramLinkedAt: timestamp("telegram_linked_at", { withTimezone: true }),
+  /** Días antes de la fecha límite en que se avisa, separados por coma. */
+  reminderDays: text("reminder_days").notNull().default("5,3,1,0"),
+  quietStart: integer("quiet_start").notNull().default(22),
+  quietEnd: integer("quiet_end").notNull().default(8),
   createdAt: ts("created_at").notNull().defaultNow(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
@@ -239,6 +249,47 @@ export const transaction = pgTable(
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [index("txn_user_date_idx").on(t.userId, t.date), index("txn_line_idx").on(t.creditLineId, t.date)],
+);
+
+/** Aprendizaje y reglas de autocategorización por comercio (RN-19). */
+export const categoryRule = pgTable(
+  "category_rule",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    /** Texto normalizado (minúsculas, sin acentos) que debe contener el comercio. */
+    pattern: text("pattern").notNull(),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => category.id, { onDelete: "cascade" }),
+    origin: text("origin").$type<"manual" | "learned">().notNull().default("manual"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("category_rule_user_pattern_uq").on(t.userId, t.pattern)],
+);
+
+/** Token de un solo uso para vincular Telegram (válido 15 min). */
+export const telegramLinkToken = pgTable("telegram_link_token", {
+  token: text("token").primaryKey(),
+  userId: owner(),
+  expiresAt: ts("expires_at").notNull(),
+});
+
+/** Avisos enviados o por enviar. La clave única evita duplicados (RNF-10). */
+export const notification = pgTable(
+  "notification",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    key: text("key").notNull(),
+    kind: text("kind").notNull(),
+    channel: text("channel").$type<"telegram">().notNull().default("telegram"),
+    body: text("body").notNull(),
+    sentAt: ts("sent_at"),
+    error: text("error"),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("notification_key_uq").on(t.key)],
 );
 
 export type User = typeof user.$inferSelect;
