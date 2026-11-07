@@ -68,3 +68,14 @@ export function getWebhookInfo() {
 
 /** Escapa texto del usuario para parse_mode HTML. */
 export const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Descarga un archivo de Telegram (fotos de tickets). Máximo ~20 MB por límite de la API de bots. */
+export async function downloadFile(fileId: string): Promise<{ data: Buffer; path: string } | null> {
+  const cfg = telegramConfig();
+  if (!cfg) return null;
+  const info = await call<{ file_path?: string }>("getFile", { file_id: fileId });
+  if (!info.ok || !info.result?.file_path) return null;
+  const res = await fetch(`https://api.telegram.org/file/bot${cfg.token}/${info.result.file_path}`, { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) return null;
+  return { data: Buffer.from(await res.arrayBuffer()), path: info.result.file_path };
+}

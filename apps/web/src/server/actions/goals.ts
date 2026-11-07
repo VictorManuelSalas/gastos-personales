@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/session";
 import { moveGoal } from "@/server/finance/mutations";
+import { startTravel, stopTravel } from "@/server/finance/tags";
 import { fail, int, isoDate, money, newId, ok, optMoney, ownAccount, str, type ActionState } from "./util";
 
 async function defaultAccountId(userId: string) {
@@ -101,4 +102,19 @@ export async function archiveGoalAction(f: FormData) {
     .where(and(eq(goal.id, str(f, "id")), eq(goal.userId, user.id)));
   revalidatePath("/app", "layout");
   redirect("/app/metas");
+}
+
+/** Activa el modo viaje ligado a esta meta (CA-16). */
+export async function startTravelAction(f: FormData) {
+  const { user } = await requireUser();
+  const g = await ownGoal(user.id, str(f, "id"));
+  if (!g) return;
+  await startTravel(user.id, g.name);
+  revalidatePath(`/app/metas/${g.id}`);
+}
+
+export async function stopTravelAction(f: FormData) {
+  const { user } = await requireUser();
+  await stopTravel(user.id);
+  revalidatePath(`/app/metas/${str(f, "id")}`);
 }

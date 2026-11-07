@@ -90,11 +90,17 @@ export function TxnForm({
         </label>
         <input id="tx-date" name="date" type="date" defaultValue={today} max={today} className="field mt-1.5" />
       </div>
-      <div className="sm:col-span-2">
+      <div>
         <label htmlFor="tx-merchant" className="block text-[12px] text-haze">
           Dónde o nota (opcional)
         </label>
         <input id="tx-merchant" name="merchant" placeholder="OXXO, Starbucks, súper…" className="field mt-1.5" />
+      </div>
+      <div>
+        <label htmlFor="tx-tags" className="block text-[12px] text-haze">
+          Etiquetas (opcional)
+        </label>
+        <input id="tx-tags" name="tags" placeholder="viaje-cancun, negocio" className="field mt-1.5" autoComplete="off" />
       </div>
       <div className="sm:col-span-2">
         <SubmitButton className="w-full sm:w-auto">Registrar</SubmitButton>

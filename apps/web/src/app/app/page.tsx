@@ -147,7 +147,14 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <div className="mt-14 grid gap-4 md:grid-cols-2">
+      <div className="mt-14 grid gap-4 md:grid-cols-3">
+        <Link href="/app/analisis" className="block">
+          <GlassCard as="article" className="h-full p-7">
+            <p className="eyebrow">Análisis</p>
+            <h3 className="mt-4 text-2xl font-semibold leading-tight tracking-tight">Tu salud, en semáforo.</h3>
+            <p className="mt-3 text-[14px] leading-relaxed text-mist">En qué se va tu dinero, tus presupuestos y siete indicadores para saber cómo vas.</p>
+          </GlassCard>
+        </Link>
         <InstallCard />
         <GlassCard as="article" className="p-7">
           <p className="eyebrow">Telegram</p>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PAYDAYS } from "./paydays";
 import { emergencyTarget, paydaysUntil, progressPct, reachDate, suggestedContribution } from "./goals";
-import { originalWords, parseMessage } from "./messages";
+import { originalWords, parseMessage, parseSimulation } from "./messages";
 
 const ctx = {
   lines: [
@@ -70,6 +70,11 @@ describe("lector de mensajes del bot", () => {
   it("recupera acentos y mayúsculas del mensaje original", () => {
     expect(originalWords("Café 65 NU", "cafe")).toBe("Café");
     expect(originalWords("Súper Chedraui 450", "super chedraui")).toBe("Súper Chedraui");
+  });
+
+  it("lee el comando del simulador", () => {
+    expect(parseSimulation("/simula laptop 12000 12 msi nu", ctx.lines)).toEqual({ product: "laptop", priceCents: 1_200_000, months: 12, lineId: "nu" });
+    expect(parseSimulation("/simula celular 9,000 a 18 meses con mercado pago", ctx.lines)).toMatchObject({ months: 18, lineId: "mp", priceCents: 900_000 });
   });
 
   it("no confunde comandos", () => {

@@ -5,6 +5,7 @@ import { category, categoryRule, db, incomeSource, moneyAccount, transaction } f
 import { and, eq, sql } from "drizzle-orm";
 import { learnCategory, normalizeMerchant, suggestCategory } from "@/server/finance/categorize";
 import { deleteTransaction, recordTransaction } from "@/server/finance/mutations";
+import { applyTags } from "@/server/finance/tags";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import {
@@ -46,7 +47,7 @@ export async function createTxnAction(_p: ActionState, f: FormData): Promise<Act
   if (kind === "income" && !account) return fail("Los ingresos entran a una cuenta, no a una tarjeta.");
   if (cat && cat.kind !== kind) return fail("Esa categoría no corresponde al tipo de movimiento.");
 
-  await recordTransaction({
+  const txnId = await recordTransaction({
     userId: user.id,
     kind,
     amountCents: amount,
@@ -57,6 +58,10 @@ export async function createTxnAction(_p: ActionState, f: FormData): Promise<Act
     merchant,
     note: optStr(f, "note"),
   });
+  const tags = str(f, "tags")
+    .split(/[\s,]+/)
+    .filter(Boolean);
+  if (tags.length) await applyTags(user.id, txnId, tags);
   // Si el usuario eligió la categoría a mano, se recuerda para ese comercio.
   if (merchant && cat && str(f, "categoryId")) await learnCategory(user.id, merchant, cat.id);
   revalidatePath("/app", "layout");

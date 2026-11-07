@@ -9,8 +9,8 @@ App de finanzas personales para la familia: tarjetas, quincenas, metas y un bot 
 **Estado:**
 - Fase 0 (base) lista: registro por invitación, inicio de sesión, PWA instalable y despliegue con Docker.
 - Fase 1 lista: cuentas, tarjetas y préstamos con ciclos automáticos, Mis quincenas, MSI, ingresos esperados vs. reales, movimientos, categorías (fusionar y reglas automáticas), importador del Excel, días de cobro configurables y avisos por Telegram.
-- Fase 2, parte 1 lista: registrar gastos, ingresos, aportes, préstamos y abonos escribiéndole al bot; metas y fondo de emergencia con apartados por quincena; Me deben (incluye importar la hoja de deudores).
-- Pendiente de la Fase 2: salud financiera, simulador de MSI, presupuestos, modo viaje, voz y fotos de tickets.
+- Fase 2 lista: registrar todo escribiéndole al bot; metas y fondo de emergencia con apartados por quincena; Me deben; análisis con salud financiera, presupuestos y gráficas; simulador "¿Me alcanza?"; etiquetas y modo viaje; fotos de tickets leídas con Claude (requiere `ANTHROPIC_API_KEY`).
+- Notas de voz: pendiente; la API de Claude no transcribe audio, se necesita un servicio de transcripción (p. ej. Whisper).
 
 Pruebas del núcleo (fechas, ciclos, quincenas, MSI):
 

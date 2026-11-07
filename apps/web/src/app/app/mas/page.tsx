@@ -9,6 +9,8 @@ export const metadata: Metadata = { title: "Más" };
 export default async function MorePage() {
   const { user } = await requireUser();
   const links = [
+    { href: "/app/analisis", title: "Análisis", body: "En qué se va tu dinero, presupuestos y tu salud financiera en semáforo." },
+    { href: "/app/simulador", title: "¿Me alcanza?", body: "Simula una compra a meses y mira cómo quedan tus próximas quincenas." },
     { href: "/app/cuentas", title: "Cuentas", body: "Débito, efectivo y ahorro. Su saldo es tu punto de partida." },
     { href: "/app/ingresos", title: "Ingresos", body: "Sueldos y cobros fijos, con lo que esperas y lo que realmente cae." },
     { href: "/app/me-deben", title: "Me deben", body: "Lo que prestaste y lo que te van abonando, persona por persona." },

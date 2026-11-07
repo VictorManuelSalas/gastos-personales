@@ -10,6 +10,7 @@ import { fmtDay } from "@/lib/dates";
 import { requireUser } from "@/lib/session";
 import { deleteTxnAction } from "@/server/actions/money";
 import { ensureDefaultCategories } from "@/server/finance/defaults";
+import { tagsForTransactions } from "@/server/finance/tags";
 
 export const metadata: Metadata = { title: "Movimientos" };
 
@@ -43,6 +44,7 @@ export default async function MovementsPage() {
       .limit(100),
   ]);
 
+  const tagMap = await tagsForTransactions(txns.map((r) => r.t.id));
   const opt = (kind: "expense" | "income") => cats.filter((c) => c.kind === kind).map((c) => ({ id: c.id, label: `${c.emoji} ${c.name}` }));
   const monthExpenses = txns.filter((r) => r.t.kind === "expense" && r.t.date >= monthFrom);
   const spent = monthExpenses.reduce((s, r) => s + r.t.amountCents, 0);
@@ -126,6 +128,11 @@ export default async function MovementsPage() {
                       ) : (
                         (accName ?? "Sin cuenta")
                       )}
+                      {tagMap.get(t.id)?.map((tg) => (
+                        <span key={tg} className="ml-2 text-glow">
+                          #{tg}
+                        </span>
+                      ))}
                     </p>
                   </div>
                   <span className={`num shrink-0 text-[15px] ${incoming ? "text-mint" : ""}`}>

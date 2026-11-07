@@ -389,8 +389,64 @@ export const receivablePayment = pgTable(
   (t) => [index("receivable_payment_idx").on(t.receivableId)],
 );
 
+// ── Presupuestos y etiquetas (Fase 2, PRD 7.4 y 7.7) ──────────────────────────
+
+/** Tope mensual por categoría (o por clase 50/30/20 si categoryId es null). */
+export const budget = pgTable(
+  "budget",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    categoryId: text("category_id").references(() => category.id, { onDelete: "cascade" }),
+    klass: text("class").$type<"essential" | "lifestyle" | "savings">(),
+    monthlyCents: cents("monthly_cents").notNull(),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [index("budget_user_idx").on(t.userId)],
+);
+
+/** Etiquetas libres que cruzan categorías (#viaje-cancun, #negocio). */
+export const tag = pgTable(
+  "tag",
+  {
+    id: text("id").primaryKey(),
+    userId: owner(),
+    name: text("name").notNull(),
+    /** Meta ligada (modo viaje: lo gastado con esta etiqueta sale de la meta). */
+    goalId: text("goal_id").references(() => goal.id, { onDelete: "set null" }),
+    createdAt: ts("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("tag_user_name_uq").on(t.userId, t.name)],
+);
+
+export const transactionTag = pgTable(
+  "txn_tag",
+  {
+    transactionId: text("txn_id")
+      .notNull()
+      .references(() => transaction.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tag.id, { onDelete: "cascade" }),
+  },
+  (t) => [uniqueIndex("txn_tag_uq").on(t.transactionId, t.tagId), index("txn_tag_tag_idx").on(t.tagId)],
+);
+
+/** Modo viaje activo por usuario: todo lo que registre el bot lleva esta etiqueta. */
+export const travelMode = pgTable("travel_mode", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  tagId: text("tag_id")
+    .notNull()
+    .references(() => tag.id, { onDelete: "cascade" }),
+  startedAt: ts("started_at").notNull().defaultNow(),
+});
+
 export type User = typeof user.$inferSelect;
 export type Invitation = typeof invitation.$inferSelect;
+export type Budget = typeof budget.$inferSelect;
+export type Tag = typeof tag.$inferSelect;
 export type Goal = typeof goal.$inferSelect;
 export type GoalMovement = typeof goalMovement.$inferSelect;
 export type Contact = typeof contact.$inferSelect;

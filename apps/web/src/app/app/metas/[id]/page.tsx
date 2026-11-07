@@ -9,7 +9,8 @@ import { Disclosure } from "@/components/ui/disclosure";
 import { GlassCard } from "@/components/ui/glass-card";
 import { fmtDay, fmtShort } from "@/lib/dates";
 import { requireUser } from "@/lib/session";
-import { archiveGoalAction, contributeGoalAction, updateGoalAction } from "@/server/actions/goals";
+import { archiveGoalAction, contributeGoalAction, startTravelAction, stopTravelAction, updateGoalAction } from "@/server/actions/goals";
+import { activeTravel, spentWithTag, upsertTagLookup } from "@/server/finance/tags";
 import { loadGoals } from "@/server/finance/goals";
 
 export const metadata: Metadata = { title: "Meta" };
@@ -21,6 +22,11 @@ export default async function GoalPage({ params }: { params: Promise<{ id: strin
   const rule = (prefs && parsePaydayRule(prefs.payDays, prefs.policy)) ?? DEFAULT_PAYDAYS;
   const g = (await loadGoals(user.id, rule, today())).find((x) => x.id === id);
   if (!g) notFound();
+
+  const travel = await activeTravel(user.id);
+  const travelingHere = travel?.goalId === g.id;
+  const goalTag = await upsertTagLookup(user.id, g.id);
+  const spentTrip = goalTag ? await spentWithTag(user.id, goalTag.id) : 0;
 
   const r = 52;
   const circ = 2 * Math.PI * r;
@@ -92,6 +98,29 @@ export default async function GoalPage({ params }: { params: Promise<{ id: strin
           </ActionForm>
         </GlassCard>
       </div>
+
+      {g.kind === "goal" ? (
+        <GlassCard interactive={false} className="mt-4 flex flex-wrap items-center gap-4 p-6">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold tracking-tight">{travelingHere ? `Modo viaje activo · #${travel!.name}` : "Modo viaje"}</h2>
+            <p className="mt-1 text-[13px] text-mist">
+              {travelingHere
+                ? "Todo lo que registres por el bot lleva esta etiqueta y se descuenta de la meta."
+                : "Al activarlo, lo que registres por el bot se etiqueta con esta meta y se descuenta de lo apartado."}
+              {spentTrip ? ` Gastado con la etiqueta: ${formatMXN(spentTrip)}.` : ""}
+            </p>
+          </div>
+          {travelingHere ? (
+            <ActionButton action={stopTravelAction} fields={{ id: g.id }}>
+              Terminar viaje
+            </ActionButton>
+          ) : (
+            <ActionButton action={startTravelAction} fields={{ id: g.id }} variant="primary">
+              Activar modo viaje
+            </ActionButton>
+          )}
+        </GlassCard>
+      ) : null}
 
       <section className="mt-12">
         <h2 className="eyebrow">Movimientos</h2>

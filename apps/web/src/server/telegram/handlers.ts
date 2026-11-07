@@ -1,4 +1,14 @@
-import { DEFAULT_PAYDAYS, formatMXN, normalizeText, originalWords, parseMessage, parsePaydayRule, quincenaFor, today } from "@gp/core";
+import {
+  DEFAULT_PAYDAYS,
+  formatMXN,
+  normalizeText,
+  originalWords,
+  parseMessage,
+  parsePaydayRule,
+  parseSimulation,
+  quincenaFor,
+  today,
+} from "@gp/core";
 import { category, contact, creditLine, cycle, db, goal, moneyAccount, telegramLinkToken, transaction, user, type Category } from "@gp/db";
 import { and, desc, eq, gt, gte, isNull, lte } from "drizzle-orm";
 import { fmtDay, fmtShort } from "@/lib/dates";
@@ -16,10 +26,21 @@ import {
   recordTransaction,
 } from "@/server/finance/mutations";
 import { isPayable, loadFinance } from "@/server/finance/overview";
-import { answerCallback, editMessageText, esc, sendMessage } from "./client";
+import { simulatePurchase } from "@/server/finance/simulate";
+import { activeTravel, applyTags, extractHashtags, spentWithTag, startTravel, stopTravel } from "@/server/finance/tags";
+import { readReceipt } from "@/server/ai/receipt";
+import { answerCallback, downloadFile, editMessageText, esc, sendMessage } from "./client";
 
 type Update = {
-  message?: { chat: { id: number }; text?: string; from?: { first_name?: string } };
+  message?: {
+    chat: { id: number };
+    text?: string;
+    caption?: string;
+    from?: { first_name?: string };
+    photo?: { file_id: string; width: number; height: number }[];
+    document?: { file_id: string; mime_type?: string };
+    voice?: { file_id: string };
+  };
   callback_query?: { id: string; data?: string; message?: { chat: { id: number }; message_id: number; text?: string } };
 };
 
@@ -31,6 +52,9 @@ const HELP =
   "• <b>aparta 500 japón</b> — aporte a una meta\n" +
   "• <b>presté 2000 a liz</b> / <b>liz abonó 500</b> — Me deben\n" +
   "• <b>estado bbva 4568.71</b> — monto del estado de cuenta\n\n" +
+  "• <b>/simula celular 9000 12 msi nu</b> — ¿me alcanza?\n" +
+  "• <b>/viaje cancún</b> — todo lo que registres lleva #cancun (/viaje fin para terminar)\n" +
+  "• Agrega <b>#etiquetas</b> a cualquier gasto\n\n" +
   "/quincena · /pagos · /metas · /medeben · /deshacer";
 
 async function userByChat(chatId: number) {
@@ -88,7 +112,12 @@ const txnButtons = (id: string): [string, string][] => [
 export async function handleUpdate(update: Update) {
   if (update.callback_query) return handleCallback(update.callback_query);
   const msg = update.message;
-  if (!msg?.text) return;
+  if (!msg) return;
+  if (msg.photo?.length || msg.document?.mime_type?.startsWith("image/")) return handlePhoto(msg);
+  if (msg.voice) {
+    return sendMessage(msg.chat.id, "Todavía no entiendo notas de voz. Escríbelo, por ejemplo: <b>tacos 180 nu</b>, o mándame la foto del ticket.");
+  }
+  if (!msg.text) return;
   const chatId = msg.chat.id;
   const text = msg.text.trim();
 
@@ -173,6 +202,49 @@ export async function handleUpdate(update: Update) {
     return sendMessage(chatId, `🗑 Borré ${esc(last.merchant ?? "el movimiento")} de ${formatMXN(last.amountCents)}.`);
   }
 
+  if (text.startsWith("/simula")) {
+    const cards = await db.select().from(creditLine).where(and(eq(creditLine.userId, u.id), isNull(creditLine.archivedAt), eq(creditLine.kind, "card")));
+    const p = parseSimulation(text, cards);
+    if (!p.priceCents) return sendMessage(chatId, "Escríbelo así: <b>/simula celular 9000 12 msi nu</b>");
+    const lineId = p.lineId ?? cards[0]?.id;
+    if (!lineId) return sendMessage(chatId, "Primero registra una tarjeta en la app.");
+    const sim = await simulatePurchase(u.id, { lineId, product: p.product, priceCents: p.priceCents, months: p.months });
+    if (!sim) return sendMessage(chatId, "No pude simularlo con esa tarjeta.");
+    const icon = sim.verdict.level === "good" ? "🟢" : sim.verdict.level === "warn" ? "🟡" : "🔴";
+    return sendMessage(
+      chatId,
+      `${icon} ${esc(sim.verdict.text)}\n\n` +
+        `${esc(capitalize(sim.product))} en ${esc(sim.line.name)}: <b>${formatMXN(sim.monthlyCents)}</b>${sim.months > 1 ? ` × ${sim.months} meses` : ""}\n` +
+        (sim.msiPctBefore != null ? `MSI: ${sim.msiPctBefore}% → ${sim.msiPctAfter}% de tu ingreso\n` : "") +
+        `Quincena más apretada: ${formatMXN(sim.minBefore, { round: true })} → <b>${formatMXN(sim.minAfter, { round: true })}</b>`,
+    );
+  }
+
+  if (text.startsWith("/viaje")) {
+    const arg = text.replace(/^\/viaje\s*/, "").trim();
+    if (!arg) {
+      const t = await activeTravel(u.id);
+      return sendMessage(
+        chatId,
+        t
+          ? `✈️ Modo viaje activo: <b>#${esc(t.name)}</b>. Llevas ${formatMXN(await spentWithTag(u.id, t.tagId))}. Para terminar: /viaje fin`
+          : "Activa el modo viaje así: <b>/viaje cancún</b>. Todo lo que registres llevará esa etiqueta.",
+      );
+    }
+    if (["fin", "terminar", "off", "stop"].includes(normalizeText(arg))) {
+      const r = await stopTravel(u.id);
+      return sendMessage(chatId, r ? `🏁 Terminó el modo viaje #${esc(r.name)}. Gastaste <b>${formatMXN(r.spentCents)}</b>.` : "No hay un viaje activo.");
+    }
+    const r = await startTravel(u.id, arg);
+    if (!r) return sendMessage(chatId, "Ese nombre no sirve como etiqueta. Prueba con letras y números.");
+    return sendMessage(
+      chatId,
+      `✈️ Modo viaje activo: <b>#${esc(r.tag.name)}</b>.` +
+        (r.goal ? ` Lo que gastes se descuenta de tu meta ${esc(r.goal.name)}.` : "") +
+        "\nTodo lo que registres aquí llevará esa etiqueta. Para terminar: /viaje fin",
+    );
+  }
+
   if (text === "/ayuda" || text === "/help") return sendMessage(chatId, HELP);
 
   const [lines, accounts, goals] = await Promise.all([
@@ -180,7 +252,10 @@ export async function handleUpdate(update: Update) {
     db.select().from(moneyAccount).where(and(eq(moneyAccount.userId, u.id), isNull(moneyAccount.archivedAt))),
     db.select({ id: goal.id, name: goal.name }).from(goal).where(and(eq(goal.userId, u.id), isNull(goal.archivedAt))),
   ]);
-  const parsed = parseMessage(text, { lines, accounts, goals });
+  const hashed = extractHashtags(text);
+  const travel = await activeTravel(u.id);
+  const tagNames = [...hashed.tags, ...(travel && !hashed.tags.includes(travel.name) ? [travel.name] : [])];
+  const parsed = parseMessage(hashed.text, { lines, accounts, goals });
 
   switch (parsed.type) {
     case "expense": {
@@ -196,14 +271,16 @@ export async function handleUpdate(update: Update) {
         categoryId: cat?.id ?? null,
         accountId: source.kind === "account" ? source.id : null,
         creditLineId: source.kind === "line" ? source.id : null,
-        merchant: parsed.description ? capitalize(originalWords(text, parsed.description)) : null,
+        merchant: parsed.description ? capitalize(originalWords(hashed.text, parsed.description)) : null,
         origin: "telegram",
       });
+      const applied = await applyTags(u.id, id, tagNames);
       const sourceName = source.kind === "line" ? lines.find((l) => l.id === source.id)?.name : accounts.find((a) => a.id === source.id)?.name;
       const ant = cat?.isAnt ? `\nAntojos esta quincena: ${formatMXN(await antTotal(u.id, u.payDays))}` : "";
+      const tagsLine = applied.length ? ` · ${applied.map((t) => `#${esc(t.name)}`).join(" ")}` : "";
       return sendMessage(
         chatId,
-        `✓ <b>${formatMXN(parsed.amountCents)}</b> · ${cat ? `${cat.emoji} ${esc(cat.name)}` : "Sin categoría"} · ${esc(sourceName ?? "")}${ant}`,
+        `✓ <b>${formatMXN(parsed.amountCents)}</b> · ${cat ? `${cat.emoji} ${esc(cat.name)}` : "Sin categoría"} · ${esc(sourceName ?? "")}${tagsLine}${ant}`,
         txnButtons(id),
       );
     }
@@ -218,7 +295,7 @@ export async function handleUpdate(update: Update) {
         amountCents: parsed.amountCents,
         categoryId: cat?.id ?? null,
         accountId: account.id,
-        merchant: parsed.description ? capitalize(originalWords(text, parsed.description)) : "Ingreso",
+        merchant: parsed.description ? capitalize(originalWords(hashed.text, parsed.description)) : "Ingreso",
         origin: "telegram",
       });
       return sendMessage(chatId, `↑ Ingreso de <b>${formatMXN(parsed.amountCents)}</b>${cat ? ` · ${cat.emoji} ${esc(cat.name)}` : ""} · ${esc(account.name)}`, txnButtons(id));
@@ -242,7 +319,7 @@ export async function handleUpdate(update: Update) {
       const person = await findOrCreateContact(u.id, parsed.contactName);
       const cardId = parsed.source?.kind === "line" ? parsed.source.id : null;
       const accountId = parsed.source?.kind === "account" ? parsed.source.id : cardId ? null : (main?.id ?? null);
-      await createLoan({ userId: u.id, contactId: person!.id, kind: cardId ? "purchase" : "cash", concept: capitalize(originalWords(text, parsed.description)), amountCents: parsed.amountCents, accountId, creditLineId: cardId });
+      await createLoan({ userId: u.id, contactId: person!.id, kind: cardId ? "purchase" : "cash", concept: capitalize(originalWords(hashed.text, parsed.description)), amountCents: parsed.amountCents, accountId, creditLineId: cardId });
       const pending = (await receivableBalances(u.id)).filter((r) => r.contactId === person!.id && r.status === "active").reduce((s, r) => s + r.pendingCents, 0);
       return sendMessage(chatId, `🤝 Le prestaste <b>${formatMXN(parsed.amountCents)}</b> a ${esc(person!.name)}. En total te debe ${formatMXN(pending)}.`);
     }
@@ -347,3 +424,74 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>) {
   return answerCallback(cb.id);
 }
 
+
+/**
+ * Foto de un ticket: Claude lee total, comercio y fecha, y se registra el gasto.
+ * El pie de foto puede indicar la tarjeta o cuenta ("nu", "efectivo") y #etiquetas.
+ */
+async function handlePhoto(msg: NonNullable<Update["message"]>) {
+  const chatId = msg.chat.id;
+  const u = await userByChat(chatId);
+  if (!u) return sendMessage(chatId, "No reconozco este chat. Conéctalo desde Quincena → Más → Ajustes → Conectar Telegram.");
+
+  const fileId = msg.photo?.length ? msg.photo[msg.photo.length - 1]!.file_id : msg.document!.file_id;
+  const file = await downloadFile(fileId);
+  if (!file) return sendMessage(chatId, "No pude descargar la foto. Intenta de nuevo.");
+  const ext = file.path.split(".").pop()?.toLowerCase();
+  const mediaType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+
+  await sendMessage(chatId, "🧾 Leyendo tu ticket…");
+  const r = await readReceipt(file.data.toString("base64"), mediaType);
+  if (!r.ok) {
+    const why =
+      r.reason === "not_configured"
+        ? "La lectura de tickets no está activada en el servidor (falta ANTHROPIC_API_KEY)."
+        : r.reason === "unreadable"
+          ? "No pude leer el total. Toma la foto más de cerca, con buena luz, o escríbelo: <b>súper 450 nu</b>."
+          : "No pude procesar la foto. Escríbelo, por ejemplo: <b>súper 450 nu</b>.";
+    return sendMessage(chatId, why);
+  }
+
+  const [lines, accounts] = await Promise.all([
+    db.select().from(creditLine).where(and(eq(creditLine.userId, u.id), isNull(creditLine.archivedAt), eq(creditLine.kind, "card"))),
+    db.select().from(moneyAccount).where(and(eq(moneyAccount.userId, u.id), isNull(moneyAccount.archivedAt))),
+  ]);
+  const caption = extractHashtags(msg.caption ?? "");
+  const fromCaption = caption.text ? parseMessage(`x 1 ${caption.text}`, { lines, accounts, goals: [] }) : null;
+  const main = await mainAccount(u.id);
+  const source =
+    fromCaption?.type === "expense" && fromCaption.source
+      ? fromCaption.source
+      : main
+        ? { kind: "account" as const, id: main.id }
+        : lines[0]
+          ? { kind: "line" as const, id: lines[0].id }
+          : null;
+  if (!source) return sendMessage(chatId, "Primero agrega una cuenta o tarjeta en la app.");
+
+  const t = today();
+  const recent = r.data.date && r.data.date <= t && r.data.date >= new Date(Date.now() - 60 * 86_400_000).toISOString().slice(0, 10);
+  const cat = r.data.merchant ? await guessCategory(u.id, r.data.merchant, "expense") : null;
+  const id = await recordTransaction({
+    userId: u.id,
+    kind: "expense",
+    amountCents: r.data.totalCents,
+    date: recent ? r.data.date! : t,
+    categoryId: cat?.id ?? null,
+    accountId: source.kind === "account" ? source.id : null,
+    creditLineId: source.kind === "line" ? source.id : null,
+    merchant: r.data.merchant,
+    note: "Leído de la foto del ticket",
+    origin: "telegram",
+  });
+  const travel = await activeTravel(u.id);
+  const applied = await applyTags(u.id, id, [...caption.tags, ...(travel ? [travel.name] : [])]);
+  const sourceName = source.kind === "line" ? lines.find((l) => l.id === source.id)?.name : accounts.find((a) => a.id === source.id)?.name;
+  return sendMessage(
+    chatId,
+    `✓ <b>${formatMXN(r.data.totalCents)}</b> · ${esc(r.data.merchant ?? "Ticket")} · ${cat ? `${cat.emoji} ${esc(cat.name)}` : "Sin categoría"} · ${esc(sourceName ?? "")}` +
+      (applied.length ? ` · ${applied.map((x) => `#${esc(x.name)}`).join(" ")}` : "") +
+      (r.data.confidence !== "high" ? "\n⚠️ El total no se leía del todo claro; revísalo." : ""),
+    txnButtons(id),
+  );
+}

@@ -1,6 +1,7 @@
-import { remindersDue, today, TZ } from "@gp/core";
+import { budgetStatus, formatMXN, inQuietHours, monthStart, remindersDue, today, TZ, type Reminder } from "@gp/core";
 import { db, notification, user } from "@gp/db";
 import { eq, isNotNull } from "drizzle-orm";
+import { monthAnalytics } from "@/server/finance/analytics";
 import { loadFinance, pendingPayments } from "@/server/finance/overview";
 import { newId } from "@/server/actions/util";
 import { sendMessage, telegramConfig } from "./client";
@@ -42,6 +43,27 @@ export async function runReminders(now = new Date()) {
           count: q.items.filter((i) => i.direction === "out" && i.status === "pending").length,
         },
       });
+
+      // Presupuestos (PRD 7.7): un aviso al llegar al 80% y otro al 100%, una vez por mes.
+      const prefs = { quietStart: u.quietStart, quietEnd: u.quietEnd };
+      if (!inQuietHours(hour, prefs) && hour >= 9) {
+        const month = monthStart(date);
+        const a = await monthAnalytics(u.id, month);
+        for (const b of a.budgets) {
+          const st = budgetStatus(b.spent, b.limit);
+          if (st.level === "good") continue;
+          const level = st.level === "bad" ? "100" : "80";
+          const budgetReminder: Reminder = {
+            key: `${u.id}:budget:${b.id}:${month}:${level}`,
+            kind: "due",
+            text:
+              level === "100"
+                ? `🔴 Te pasaste del presupuesto de ${b.label}: ${formatMXN(b.spent, { round: true })} de ${formatMXN(b.limit, { round: true })} este mes.`
+                : `🟡 Vas en ${st.pct}% del presupuesto de ${b.label}: ${formatMXN(b.spent, { round: true })} de ${formatMXN(b.limit, { round: true })}.`,
+          };
+          reminders.push(budgetReminder);
+        }
+      }
 
       for (const r of reminders) {
         const [claimed] = await db

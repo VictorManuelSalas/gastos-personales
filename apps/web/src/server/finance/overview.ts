@@ -70,9 +70,14 @@ export type CycleView = Cycle & {
 };
 
 /** Todo lo que necesitan las vistas de un usuario, cargado en una sola pasada. */
-export async function loadFinance(userId: string, now = todayISO()) {
+export async function loadFinance(
+  userId: string,
+  now = todayISO(),
+  /** Compras a MSI hipotéticas para el simulador (no se guardan). */
+  opts: { extraInstallments?: InstallmentRow[] } = {},
+) {
   const since = monthStart(now, -8);
-  const [[prefs], accounts, lines, cycleRows, installments, sources, incomes, expenses] = await Promise.all([
+  const [[prefs], accounts, lines, cycleRows, savedInstallments, sources, incomes, expenses] = await Promise.all([
     db.select({ payDays: user.payDays, policy: user.paydayPolicy }).from(user).where(eq(user.id, userId)),
     db.select().from(moneyAccount).where(and(eq(moneyAccount.userId, userId), isNull(moneyAccount.archivedAt))).orderBy(moneyAccount.createdAt),
     db.select().from(creditLine).where(and(eq(creditLine.userId, userId), isNull(creditLine.archivedAt))).orderBy(creditLine.createdAt),
@@ -90,6 +95,7 @@ export async function loadFinance(userId: string, now = todayISO()) {
       .where(and(eq(transaction.userId, userId), eq(transaction.kind, "expense"), isNotNull(transaction.creditLineId), gte(transaction.date, since))),
   ]);
 
+  const installments = [...savedInstallments, ...(opts.extraInstallments ?? [])];
   const rule = (prefs && parsePaydayRule(prefs.payDays, prefs.policy)) ?? DEFAULT_PAYDAYS;
   const balanceCents = accounts.filter((a) => a.inAvailable).reduce((s, a) => s + a.balanceCents, 0);
   const paydays = upcomingPaydays(rule, now, QUINCENAS_AHEAD + 1);
@@ -125,7 +131,10 @@ export async function loadFinance(userId: string, now = todayISO()) {
         .sort((a, b) => b.cutDate.localeCompare(a.cutDate))
         .slice(0, 3);
       const avg = last.length ? Math.round(last.reduce((s, r) => s + r.statementCents!, 0) / last.length) : 0;
-      amountCents = Math.max(spentCents + msiCents, avg);
+      // Las cuotas de MSI que empezaron después del último estado de cuenta no están en el promedio: se suman.
+      const latestStatement = last[0]?.cutDate ?? "0000-00-00";
+      const newMsi = installmentsDueAt(lineInst.filter((i) => i.firstCut > latestStatement), c.cut);
+      amountCents = Math.max(spentCents + msiCents, avg + newMsi);
       source = "estimate";
     }
 

@@ -146,3 +146,18 @@ export function originalWords(raw: string, description: string): string {
   }
   return out.join(" ");
 }
+
+/** "/simula laptop 12000 12 msi nu" → producto, precio, meses y tarjeta. */
+export function parseSimulation(raw: string, lines: NamedRef[]) {
+  let text = normalizeText(raw.replace(/^\/simula\s*/i, ""));
+  let months = 1;
+  const m = text.match(/(?:^|\s)(\d{1,2})\s*(?:msi|meses|mes)(?=\s|$)/);
+  if (m) {
+    months = Number(m[1]);
+    text = (text.slice(0, m.index) + " " + text.slice(m.index! + m[0].length)).replace(/\s+/g, " ").trim();
+  }
+  const { cents, rest } = takeAmount(text);
+  const line = findRef(rest, lines);
+  const product = clean(line?.rest ?? rest) || "compra";
+  return { product, priceCents: cents, months, lineId: line?.ref.id ?? null };
+}
