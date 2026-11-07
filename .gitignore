@@ -1,0 +1,22 @@
+# Datos financieros personales: nunca subir
+docs/privado/
+*.xlsx
+*.csv
+
+# Node / Next.js
+node_modules/
+.next/
+dist/
+coverage/
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Sistema
+.DS_Store
+
+# pnpm (store creado dentro de Docker)
+.pnpm-store/
+*.tsbuildinfo

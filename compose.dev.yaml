@@ -1,0 +1,32 @@
+# Desarrollo con recarga en caliente, sin instalar Node en la Mac.
+# Uso: docker compose -f compose.yaml -f compose.dev.yaml up db dev
+services:
+  dev:
+    image: node:22-alpine
+    working_dir: /repo
+    command: sh -c "corepack enable && pnpm install && pnpm --filter @gp/web dev"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://quincena:${POSTGRES_PASSWORD}@db:5432/quincena
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Define BETTER_AUTH_SECRET en .env}
+      BETTER_AUTH_URL: ${APP_URL:-http://localhost:3100}
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      WATCHPACK_POLLING: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      npm_config_store_dir: /pnpm-store
+      CI: "true"
+      TZ: America/Mexico_City
+    ports:
+      - "${WEB_PORT:-3100}:3000"
+    volumes:
+      - .:/repo
+      - node_modules:/repo/node_modules
+      - next_cache:/repo/apps/web/.next
+      - pnpm_store:/pnpm-store
+
+volumes:
+  node_modules:
+  next_cache:
+  pnpm_store:

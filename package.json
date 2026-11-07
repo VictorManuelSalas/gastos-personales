@@ -1,0 +1,11 @@
+{
+  "name": "quincena",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "dev": "pnpm --filter @gp/web dev",
+    "build": "pnpm --filter @gp/web build",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @gp/db generate"
+  }
+}
