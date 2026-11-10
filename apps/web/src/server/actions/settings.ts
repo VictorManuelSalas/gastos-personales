@@ -56,6 +56,12 @@ export async function disconnectTelegramAction() {
   revalidatePath("/app/ajustes");
 }
 
+/** El recorrido de Inicio ya se vio (o se saltó): no se vuelve a abrir solo. */
+export async function markTourSeenAction() {
+  const { user: u } = await requireUser();
+  await db.update(user).set({ tourSeenAt: new Date() }).where(eq(user.id, u.id));
+}
+
 /** Admin: registra el webhook del bot en Telegram con la URL pública de la app. */
 export async function registerWebhookAction(_p: ActionState, _f: FormData): Promise<ActionState> {
   const { user: u } = await requireUser();

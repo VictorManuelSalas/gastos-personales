@@ -1,7 +1,8 @@
 import { TabBar, TopNav } from "@/components/app-nav";
+import { AppTour } from "@/components/app-tour";
 import { UserMenu } from "@/components/user-menu";
 import { Brand } from "@/components/ui/brand";
-import { db, notification } from "@gp/db";
+import { db, notification, user as userTable } from "@gp/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
@@ -20,10 +21,13 @@ function initials(name: string) {
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user } = await requireUser();
   const isAdmin = user.role === "admin";
-  const [{ n: unread } = { n: 0 }] = await db
-    .select({ n: sql<number>`count(*)::int` })
-    .from(notification)
-    .where(and(eq(notification.userId, user.id), isNull(notification.readAt)));
+  const [[{ n: unread } = { n: 0 }], [prefs]] = await Promise.all([
+    db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(notification)
+      .where(and(eq(notification.userId, user.id), isNull(notification.readAt))),
+    db.select({ tourSeenAt: userTable.tourSeenAt }).from(userTable).where(eq(userTable.id, user.id)),
+  ]);
 
   return (
     <div className="min-h-dvh pb-32 md:pb-16">
@@ -34,6 +38,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-1.5">
             <Link
               href="/app/avisos"
+              data-tour="avisos"
               aria-label={unread ? `${unread} avisos sin leer` : "Avisos"}
               className="relative grid h-9 w-9 place-items-center rounded-full text-mist transition-colors hover:bg-white/5 hover:text-ink"
             >
@@ -46,12 +51,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </span>
               ) : null}
             </Link>
-            <UserMenu name={user.name} email={user.email} initials={initials(user.name)} />
+            <div data-tour="cuenta">
+              <UserMenu name={user.name} email={user.email} initials={initials(user.name)} />
+            </div>
           </div>
         </div>
       </header>
       <main className="gutter mx-auto max-w-5xl pt-12 md:pt-16">{children}</main>
       <TabBar isAdmin={isAdmin} />
+      <AppTour autoStart={!prefs?.tourSeenAt} />
     </div>
   );
 }

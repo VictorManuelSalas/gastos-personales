@@ -2,6 +2,7 @@ import { addDays, centsToInput, detectSubscriptions, formatMXN, monthStart, toda
 import { category, contact, creditLine, db, moneyAccount, transaction } from "@gp/db";
 import { and, eq, gte, isNull } from "drizzle-orm";
 import type { Metadata } from "next";
+import { HELP } from "@/lib/help";
 import { ActionButton, ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { Disclosure } from "@/components/ui/disclosure";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -168,7 +169,7 @@ export default async function BillsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Servicios y suscripciones" title={<span className="num">{formatMXN(monthly, { round: true })}</span>}>
+      <PageHeader eyebrow="Servicios y suscripciones" help={HELP.servicios} title={<span className="num">{formatMXN(monthly, { round: true })}</span>}>
         Lo que pagas cada mes en servicios y suscripciones. Te avisamos 3 días antes de cada vencimiento.
       </PageHeader>
 

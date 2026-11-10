@@ -1,5 +1,6 @@
 import { formatMXN } from "@gp/core";
 import type { Metadata } from "next";
+import { HELP } from "@/lib/help";
 import Link from "next/link";
 import { LineForm } from "@/components/finance/line-form";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -19,7 +20,7 @@ export default async function CardsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Tarjetas y préstamos" title="Cada corte, en su lugar.">
+      <PageHeader eyebrow="Tarjetas y préstamos" help={HELP.tarjetas} title="Cada corte, en su lugar.">
         Registra cada tarjeta una vez. Los ciclos, las fechas límite y la quincena que los paga se calculan solos.
       </PageHeader>
 

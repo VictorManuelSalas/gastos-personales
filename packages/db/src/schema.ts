@@ -30,6 +30,8 @@ export const user = pgTable("user", {
   lastLoginAt: ts("last_login_at"),
   /** Si tiene fecha, el administrador bloqueó la cuenta: no puede entrar ni usar el bot. */
   blockedAt: ts("blocked_at"),
+  /** Cuándo vio (o saltó) el recorrido guiado de Inicio; sin fecha se le muestra al entrar. */
+  tourSeenAt: ts("tour_seen_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });

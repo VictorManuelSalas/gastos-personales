@@ -78,6 +78,13 @@
       "when": 1794347362129,
       "tag": "0010_mute_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1794351696470,
+      "tag": "0011_yielding_justice",
+      "breakpoints": true
     }
   ]
 }

@@ -46,7 +46,7 @@ export default async function HomePage() {
         <h1 className="rise d1 mt-5 text-[clamp(1.1rem,2vw,1.25rem)] font-medium text-mist">
           Quincena del {fmtShort(current!.payday)} al {fmtShort(current!.end)}
         </h1>
-        <p className="rise d1 mt-3 text-[clamp(3.4rem,11vw,7.5rem)] font-semibold leading-[0.9] tracking-tighter num">
+        <p data-tour="disponible" className="rise d1 mt-3 text-[clamp(3.4rem,11vw,7.5rem)] font-semibold leading-[0.9] tracking-tighter num">
           <span className={current!.endCents < 0 ? "text-rose" : "chrome"}>{formatMXN(current!.endCents)}</span>
         </p>
         <p className="rise d2 mt-5 max-w-xl text-lg leading-relaxed text-mist">
@@ -54,7 +54,7 @@ export default async function HomePage() {
             ? "Esta quincena no alcanza para todo lo pendiente. Revisa qué pago puedes mover."
             : `Es lo que te queda después de lo pendiente. Faltan ${nextIn} ${nextIn === 1 ? "día" : "días"} para el próximo cobro.`}
         </p>
-        <dl className="rise d3 mt-10 grid max-w-xl grid-cols-3 gap-6 border-t border-white/10 pt-6">
+        <dl data-tour="resumen" className="rise d3 mt-10 grid max-w-xl grid-cols-3 gap-6 border-t border-white/10 pt-6">
           <div>
             <dt className="eyebrow">{f.reservedCents > 0 ? "Disponible hoy" : "Saldo hoy"}</dt>
             <dd className="num mt-2 text-xl font-semibold tracking-tight">{formatMXN(current!.startCents, { round: true })}</dd>
@@ -104,7 +104,7 @@ export default async function HomePage() {
         </GlassCard>
       ) : null}
 
-      <section className="mt-14">
+      <section data-tour="esta-quincena" className="mt-14">
         <div className="flex items-baseline justify-between">
           <h2 className="eyebrow">Esta quincena</h2>
           <span className="text-[12px] text-haze">hasta el {fmtLong(current!.end)}</span>
@@ -120,7 +120,7 @@ export default async function HomePage() {
         )}
       </section>
 
-      <section className="mt-14">
+      <section data-tour="proximas" className="mt-14">
         <h2 className="eyebrow">Próximas quincenas</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {upcoming.map((q) => (

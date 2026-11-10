@@ -2,6 +2,7 @@ import { formatMXN } from "@gp/core";
 import { db, incomeSource, moneyAccount, transaction } from "@gp/db";
 import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import type { Metadata } from "next";
+import { HELP } from "@/lib/help";
 import { IncomeSourceForm } from "@/components/finance/income-source-form";
 import { ActionButton } from "@/components/ui/action-form";
 import { Disclosure } from "@/components/ui/disclosure";
@@ -29,7 +30,7 @@ export default async function IncomePage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Ingresos" title={<span className="num">{formatMXN(perQuincena)}</span>}>
+      <PageHeader eyebrow="Ingresos" help={HELP.ingresos} title={<span className="num">{formatMXN(perQuincena)}</span>}>
         Lo que esperas recibir cada quincena. El día de cobro confirmas lo que realmente cayó (horas extra, días de más) desde tu
         quincena.
       </PageHeader>

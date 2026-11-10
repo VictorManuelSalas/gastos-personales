@@ -2,6 +2,7 @@ import { centsToInput, formatMXN, monthStart, today } from "@gp/core";
 import { category, creditLine, db, moneyAccount, transaction, transactionSplit } from "@gp/db";
 import { and, desc, eq, gte, inArray, isNull } from "drizzle-orm";
 import type { Metadata } from "next";
+import { HELP } from "@/lib/help";
 import { SplitForm } from "@/components/finance/split-form";
 import { TxnForm } from "@/components/finance/txn-form";
 import { ActionButton } from "@/components/ui/action-form";
@@ -71,7 +72,7 @@ export default async function MovementsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Movimientos" title="Lo que entra. Lo que sale.">
+      <PageHeader eyebrow="Movimientos" help={HELP.movimientos} title="Lo que entra. Lo que sale.">
         Registra gastos con débito, efectivo o tarjeta, e ingresos extra. Con tarjeta de crédito, el gasto se suma a su ciclo.
       </PageHeader>
 

@@ -2,6 +2,7 @@ import { DEFAULT_PAYDAYS, describePaydays, parsePaydayRule } from "@gp/core";
 import { db, user as userTable } from "@gp/db";
 import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { signOutAction } from "@/app/(auth)/actions";
 import { ActionButton, ActionForm, SubmitButton } from "@/components/ui/action-form";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -202,6 +203,16 @@ export default async function SettingsPage() {
             server={serverAi()?.provider ?? null}
             serverKeys={(["gemini", "openai", "anthropic"] as AiProvider[]).filter((p) => !!process.env[SERVER_KEY_ENV[p]])}
           />
+        </GlassCard>
+      </section>
+
+      <section className="mt-12">
+        <h2 className="eyebrow">Ayuda</h2>
+        <GlassCard interactive={false} className="mt-4 flex flex-wrap items-center gap-4 p-6 md:p-8">
+          <p className="min-w-0 flex-1 text-[15px] text-mist">Vuelve a ver el recorrido de Inicio. En varias pantallas también hay un «?» con ayuda de esa sección.</p>
+          <Link href="/app?recorrido=1" className="btn btn-ghost rounded-full px-5 py-2.5 text-[14px]">
+            Ver el recorrido
+          </Link>
         </GlassCard>
       </section>
 

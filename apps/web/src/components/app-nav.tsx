@@ -67,6 +67,7 @@ export function TopNav({ isAdmin }: { isAdmin: boolean }) {
         return (
           <Link
             key={it.href}
+            data-tour={`nav-${it.icon}`}
             href={it.href}
             className={`relative rounded-full px-4 py-2 text-[13px] transition-colors duration-200 ${active ? "text-ink" : "text-mist hover:text-ink"}`}
           >
@@ -105,6 +106,7 @@ export function TabBar({ isAdmin }: { isAdmin: boolean }) {
           return (
             <Link
               key={it.href}
+            data-tour={`nav-${it.icon}`}
               href={it.href}
               aria-current={active ? "page" : undefined}
               className={`btn relative flex-1 flex-col gap-0.5 rounded-full py-2 text-[10px] ${active ? "text-ink" : "text-haze"}`}
