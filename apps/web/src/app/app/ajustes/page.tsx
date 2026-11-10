@@ -16,6 +16,7 @@ import {
   updateRemindersAction,
 } from "@/server/actions/settings";
 import { telegramConfig } from "@/server/telegram/client";
+import { TelegramLinkWatcher } from "@/components/telegram-link-watcher";
 import { PushToggle } from "@/components/push-toggle";
 import { updateNotifPrefsAction } from "@/server/actions/notifications";
 import { pushConfig } from "@/server/notify/push";
@@ -32,7 +33,7 @@ const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
 export default async function SettingsPage() {
   const { user: session } = await requireUser();
-  const [[u], [ai]] = await Promise.all([
+  const [[u], aiKeys] = await Promise.all([
     db.select().from(userTable).where(eq(userTable.id, session.id)),
     db.select().from(userAiSetting).where(eq(userAiSetting.userId, session.id)),
   ]);
@@ -117,6 +118,7 @@ export default async function SettingsPage() {
               <form action={connectTelegramAction}>
                 <SubmitButton pending="Abriendo Telegram…">Conectar Telegram</SubmitButton>
               </form>
+              <TelegramLinkWatcher />
             </div>
           )}
 
@@ -196,7 +198,7 @@ export default async function SettingsPage() {
         <h2 className="eyebrow">Inteligencia artificial</h2>
         <GlassCard interactive={false} className="mt-4 p-6 md:p-8">
           <AiSettingsForm
-            current={ai ? { provider: ai.provider, model: ai.model, keyHint: ai.keyHint } : null}
+            keys={aiKeys.map((k) => ({ provider: k.provider, model: k.model, keyHint: k.keyHint, isPrimary: k.isPrimary }))}
             server={serverAi()?.provider ?? null}
             serverKeys={(["gemini", "openai", "anthropic"] as AiProvider[]).filter((p) => !!process.env[SERVER_KEY_ENV[p]])}
           />

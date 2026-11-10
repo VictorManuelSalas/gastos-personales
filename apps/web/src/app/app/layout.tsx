@@ -1,4 +1,5 @@
 import { TabBar, TopNav } from "@/components/app-nav";
+import { UserMenu } from "@/components/user-menu";
 import { Brand } from "@/components/ui/brand";
 import { db, notification } from "@gp/db";
 import { and, eq, isNull, sql } from "drizzle-orm";
@@ -45,12 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </span>
               ) : null}
             </Link>
-            <span
-              className="grid h-9 w-9 place-items-center rounded-full bg-white/5 text-[13px] font-semibold ring-1 ring-white/10"
-              title={user.name}
-            >
-              {initials(user.name)}
-            </span>
+            <UserMenu name={user.name} email={user.email} initials={initials(user.name)} />
           </div>
         </div>
       </header>

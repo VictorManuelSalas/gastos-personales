@@ -175,7 +175,7 @@ export default async function CategoriesPage() {
       {(["expense", "income"] as const).map((kind) => (
         <section key={kind} className="mt-12">
           <h2 className="eyebrow">{kind === "expense" ? "Gastos" : "Ingresos"}</h2>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {group(kind)
               .filter((c) => !c.parentId)
               .flatMap((c) => [c, ...group(kind).filter((x) => x.parentId === c.id)])

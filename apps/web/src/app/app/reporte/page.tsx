@@ -78,7 +78,7 @@ export default async function YearReportPage({ searchParams }: { searchParams: P
         ))}
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-5">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-5">
         <GlassCard interactive={false} className="p-6 lg:col-span-3">
           <h2 className="text-lg font-semibold tracking-tight">Gasto registrado por mes</h2>
           <div className="mt-6">

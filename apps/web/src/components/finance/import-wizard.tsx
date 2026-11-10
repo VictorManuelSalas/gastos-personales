@@ -105,7 +105,7 @@ export function ImportWizard() {
                       {l.name}
                       {l.existing ? <span className="ml-2 text-[12px] font-normal text-haze">ya existe: solo se agrega historial</span> : null}
                     </label>
-                    <select name={`kind_${l.index}`} defaultValue={l.kind} aria-label={`Tipo de ${l.name}`} className="field !w-auto !py-1.5 text-[13px]">
+                    <select name={`kind_${l.index}`} defaultValue={l.kind} aria-label={`Tipo de ${l.name}`} className="field !w-auto !py-1.5 sm:text-[13px]">
                       <option value="card">Tarjeta</option>
                       <option value="loan">Préstamo</option>
                     </select>

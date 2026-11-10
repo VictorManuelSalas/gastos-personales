@@ -1,4 +1,4 @@
-import { bigint, boolean, date, index, integer, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, boolean, date, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 const ts = (name: string) => timestamp(name, { withTimezone: true });
 
@@ -660,16 +660,22 @@ export const quincenaClose = pgTable(
  * IA de cada usuario (traer tu propia llave). La llave se guarda cifrada con
  * AES-256-GCM; solo se muestran sus últimos 4 caracteres.
  */
-export const userAiSetting = pgTable("user_ai_setting", {
-  userId: text("user_id")
-    .primaryKey()
-    .references(() => user.id, { onDelete: "cascade" }),
-  provider: text("provider").$type<"gemini" | "openai" | "anthropic">().notNull(),
-  model: text("model"),
-  encryptedKey: text("encrypted_key"),
-  keyHint: text("key_hint"),
-  updatedAt: ts("updated_at").notNull().defaultNow(),
-});
+/** Una fila por proveedor; la IA usa la marcada como principal. */
+export const userAiSetting = pgTable(
+  "user_ai_setting",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").$type<"gemini" | "openai" | "anthropic">().notNull(),
+    model: text("model"),
+    encryptedKey: text("encrypted_key"),
+    keyHint: text("key_hint"),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.provider] })],
+);
 
 export type WishlistItem = typeof wishlistItem.$inferSelect;
 export type RecurringBill = typeof recurringBill.$inferSelect;

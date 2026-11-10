@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { AI_DEFAULT_MODELS, normalizeReceipt, RECEIPT_PROMPT, supportsVoice, type AiProvider, type ReceiptData } from "@gp/core";
 import { db, userAiSetting } from "@gp/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { decryptSecret } from "./crypto";
 
 /**
@@ -37,7 +37,10 @@ export function serverAi(): { provider: AiProvider; apiKey: string } | null {
 }
 
 export async function resolveAi(userId: string): Promise<Resolved | null> {
-  const [s] = await db.select().from(userAiSetting).where(eq(userAiSetting.userId, userId));
+  const [s] = await db
+    .select()
+    .from(userAiSetting)
+    .where(and(eq(userAiSetting.userId, userId), eq(userAiSetting.isPrimary, true)));
   if (s?.encryptedKey) {
     const key = decryptSecret(s.encryptedKey);
     if (key) return { provider: s.provider, model: s.model || AI_DEFAULT_MODELS[s.provider], apiKey: key, source: "user" };

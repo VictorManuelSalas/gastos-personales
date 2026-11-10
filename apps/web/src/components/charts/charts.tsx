@@ -50,7 +50,7 @@ export function TrendBars({ data, labels }: { data: { month: string; cents: numb
             <span key={t}>{fmt(t)}</span>
           ))}
         </div>
-        <div className="relative flex flex-1 items-end gap-2" style={{ height: H }} onMouseLeave={() => setHover(null)}>
+        <div className="relative flex flex-1 items-end gap-1 sm:gap-2" style={{ height: H }} onMouseLeave={() => setHover(null)}>
           {[0, 0.5, 1].map((t) => (
             <div key={t} className="pointer-events-none absolute inset-x-0 border-t border-white/[.05]" style={{ bottom: `${t * 100}%` }} />
           ))}
@@ -80,9 +80,9 @@ export function TrendBars({ data, labels }: { data: { month: string; cents: numb
           })}
         </div>
       </div>
-      <div className="ml-[68px] mt-2 flex gap-2">
+      <div className="ml-[68px] mt-2 flex gap-1 sm:gap-2">
         {labels.map((l, i) => (
-          <span key={l + i} className={`flex-1 text-center text-[11px] ${i === labels.length - 1 ? "text-ink" : "text-haze"}`}>
+          <span key={l + i} className={`min-w-0 flex-1 text-center text-[11px] max-sm:odd:invisible ${i === labels.length - 1 ? "text-ink" : "text-haze"}`}>
             {l}
           </span>
         ))}

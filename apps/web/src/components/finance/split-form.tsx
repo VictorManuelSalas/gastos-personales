@@ -24,7 +24,7 @@ export function SplitForm({ txnId, amountLabel, categories, current }: { txnId: 
               <p className="text-[12px] text-haze">Las partes deben sumar {amountLabel}. Deja todo vacío para quitar la división.</p>
               {rows.map((r, i) => (
                 <div key={i} className="grid grid-cols-[1fr_110px] gap-2">
-                  <select name="splitCategory" defaultValue={r.categoryId ?? ""} aria-label={`Categoría de la parte ${i + 1}`} className="field !py-2 text-[13px]">
+                  <select name="splitCategory" defaultValue={r.categoryId ?? ""} aria-label={`Categoría de la parte ${i + 1}`} className="field !py-2 sm:text-[13px]">
                     <option value="">Sin categoría</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -32,7 +32,7 @@ export function SplitForm({ txnId, amountLabel, categories, current }: { txnId: 
                       </option>
                     ))}
                   </select>
-                  <input name="splitAmount" inputMode="decimal" defaultValue={r.amount} placeholder="0.00" aria-label={`Monto de la parte ${i + 1}`} className="field num !py-2 text-[13px]" />
+                  <input name="splitAmount" inputMode="decimal" defaultValue={r.amount} placeholder="0.00" aria-label={`Monto de la parte ${i + 1}`} className="field num !py-2 sm:text-[13px]" />
                 </div>
               ))}
               <div>
