@@ -117,6 +117,7 @@ export async function runImportAction(_p: ImportState, form: FormData): Promise<
         const paid = c.due < now || c.paid;
         const values = {
           statementCents: c.amountCents,
+          statementAt: new Date(),
           paidAt: paid ? c.due : null,
           paidCents: paid ? c.amountCents : null,
           note: `Importado de "${c.sheet}"`,

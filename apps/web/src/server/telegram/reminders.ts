@@ -15,7 +15,7 @@ import {
   type Reminder,
 } from "@gp/core";
 import { category, db, notification, pushSubscription, transaction, user, wishlistItem, type User } from "@gp/db";
-import { and, desc, eq, gt, gte, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, isNull, lte, ne, sql } from "drizzle-orm";
 import { newId } from "@/server/actions/util";
 import { monthAnalytics } from "@/server/finance/analytics";
 import { upcomingBills } from "@/server/finance/bills";
@@ -179,7 +179,7 @@ async function extraReminders(u: User, f: Finance, date: string, hour: number, n
 export async function runReminders(now = new Date()) {
   const tg = telegramConfig();
   const push = pushConfig();
-  const users = await db.select().from(user);
+  const users = await db.select().from(user).where(isNull(user.blockedAt));
   const date = today(TZ, now);
   const hour = hourIn(TZ, now);
   let sent = 0;

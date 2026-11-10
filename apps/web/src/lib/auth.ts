@@ -71,6 +71,12 @@ export const auth = betterAuth({
   hooks: {
     // Registro cerrado: solo con invitación vigente (o si aún no existe ningún usuario).
     before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-in/email") {
+        const email = String((ctx.body as { email?: string } | undefined)?.email ?? "").toLowerCase();
+        const [u] = await db.select({ blockedAt: user.blockedAt }).from(user).where(eq(user.email, email));
+        if (u?.blockedAt) throw new APIError("FORBIDDEN", { message: "Tu cuenta está bloqueada. Habla con quien administra Quincena." });
+        return;
+      }
       if (ctx.path !== "/sign-up/email") return;
       if (await isFirstUser()) return;
 
@@ -88,9 +94,11 @@ export const auth = betterAuth({
       }
     }),
     after: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/sign-up/email" && ctx.path !== "/sign-in/email") return;
+      const newUser = ctx.context.newSession?.user;
+      if (newUser) await db.update(user).set({ lastLoginAt: new Date() }).where(eq(user.id, newUser.id));
       if (ctx.path !== "/sign-up/email") return;
       const token = ctx.headers?.get(INVITE_HEADER);
-      const newUser = ctx.context.newSession?.user;
       if (!token || !newUser) return;
       await db
         .update(invitation)

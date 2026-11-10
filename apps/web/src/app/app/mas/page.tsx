@@ -23,7 +23,10 @@ export default async function MorePage() {
     { href: "/app/importar", title: "Importar Excel", body: "Trae tus tarjetas, tu historial y tus compras a meses desde tu hoja." },
     { href: "/app/categorias", title: "Categorías", body: "En qué se va tu dinero. Crea, archiva y marca los antojos." },
     ...(user.role === "admin"
-      ? [{ href: "/app/invitaciones", title: "Invitaciones", body: "Enlaces de un solo uso para tu familia." }]
+      ? [
+          { href: "/app/invitaciones", title: "Invitaciones", body: "Enlaces de un solo uso para tu familia, y si ya se usaron." },
+          { href: "/app/usuarios", title: "Usuarios", body: "Quién usa el sistema, su último acceso y bloquear o reactivar cuentas." },
+        ]
       : []),
     { href: "/app/ajustes", title: "Ajustes", body: "Tu cuenta y cerrar sesión." },
   ];

@@ -65,6 +65,8 @@ export type CycleView = Cycle & {
   /** De dónde sale el monto. */
   source: "statement" | "calculated" | "estimate" | "fixed";
   spentCents: number;
+  /** Ciclo abierto con monto capturado: gastos registrados después de capturarlo (ya sumados en amountCents). */
+  newSpentCents: number;
   msiCents: number;
   payday: ISODate;
   status: "upcoming" | "open" | "cut" | "paid" | "overdue" | "empty";
@@ -91,7 +93,7 @@ export async function loadFinance(
       .where(and(eq(transaction.userId, userId), eq(transaction.kind, "income"), isNotNull(transaction.incomeSourceId)))
       .orderBy(desc(transaction.periodDate)),
     db
-      .select({ creditLineId: transaction.creditLineId, date: transaction.date, amountCents: transaction.amountCents })
+      .select({ creditLineId: transaction.creditLineId, date: transaction.date, amountCents: transaction.amountCents, createdAt: transaction.createdAt })
       .from(transaction)
       .where(and(eq(transaction.userId, userId), eq(transaction.kind, "expense"), isNotNull(transaction.creditLineId), gte(transaction.date, since))),
   ]);
@@ -110,9 +112,9 @@ export async function loadFinance(
     const due = row?.dueOverride ?? c.due;
     const lineInst = installments.filter((i) => i.creditLineId === line.id).map(toInstallment);
     const msiCents = line.kind === "card" ? installmentsDueAt(lineInst, c.cut) : 0;
-    const spentCents = expenses
-      .filter((e) => e.creditLineId === line.id && e.date >= c.start && e.date <= c.cut)
-      .reduce((s, e) => s + e.amountCents, 0);
+    const cycleExpenses = expenses.filter((e) => e.creditLineId === line.id && e.date >= c.start && e.date <= c.cut);
+    const spentCents = cycleExpenses.reduce((s, e) => s + e.amountCents, 0);
+    let newSpentCents = 0;
 
     let amountCents: number;
     let source: CycleView["source"];
@@ -120,7 +122,10 @@ export async function loadFinance(
       amountCents = row?.statementCents ?? line.fixedPaymentCents ?? 0;
       source = row?.statementCents != null ? "statement" : "fixed";
     } else if (row?.statementCents != null) {
-      amountCents = row.statementCents;
+      // Ciclo abierto: lo capturado más los gastos registrados después de capturarlo (los anteriores ya van incluidos).
+      const since = row.statementAt;
+      if (c.cut >= now && since) newSpentCents = cycleExpenses.filter((e) => e.createdAt > since).reduce((s, e) => s + e.amountCents, 0);
+      amountCents = row.statementCents + newSpentCents;
       source = "statement";
     } else if (c.cut < now) {
       amountCents = spentCents + msiCents;
@@ -159,6 +164,7 @@ export async function loadFinance(
       amountCents: paid ? (row?.paidCents ?? amountCents) : amountCents,
       source,
       spentCents,
+      newSpentCents,
       msiCents,
       payday: row?.paydayOverride ?? assignPayday(rule, due),
       status,

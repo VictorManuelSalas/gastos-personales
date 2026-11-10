@@ -106,7 +106,10 @@ export async function setStatementAction(_p: ActionState, f: FormData): Promise<
   const statement = optMoney(f, "statement");
   const minimum = optMoney(f, "minimum");
   if (statement === undefined || minimum === undefined) return fail("Revisa los montos: escribe solo números.");
-  await upsertCycle(user.id, line.id, cut, { statementCents: statement, minimumCents: minimum });
+  const [prev] = await db.select().from(cycle).where(and(eq(cycle.creditLineId, line.id), eq(cycle.cutDate, cut)));
+  // Solo un monto nuevo reinicia la fecha: los gastos registrados antes se asumen incluidos en él.
+  const statementAt = statement == null ? null : statement === prev?.statementCents ? prev.statementAt : new Date();
+  await upsertCycle(user.id, line.id, cut, { statementCents: statement, statementAt, minimumCents: minimum });
   revalidatePath("/app", "layout");
   return ok();
 }

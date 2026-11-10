@@ -62,7 +62,8 @@ const HELP =
 
 async function userByChat(chatId: number) {
   const [u] = await db.select().from(user).where(eq(user.telegramChatId, String(chatId)));
-  return u ?? null;
+  // Cuenta bloqueada: el bot la trata como no vinculada.
+  return u && !u.blockedAt ? u : null;
 }
 
 const capitalize = (s: string) => s.replace(/^\p{L}/u, (c) => c.toUpperCase());
@@ -363,8 +364,8 @@ export async function handleUpdate(update: Update): Promise<unknown> {
       if (!cv) return sendMessage(chatId, `${esc(line.name)} no tiene un corte pendiente.`);
       await db
         .insert(cycle)
-        .values({ id: newId(), userId: u.id, creditLineId: line.id, cutDate: cv.cut, statementCents: parsed.amountCents })
-        .onConflictDoUpdate({ target: [cycle.creditLineId, cycle.cutDate], set: { statementCents: parsed.amountCents, updatedAt: new Date() } });
+        .values({ id: newId(), userId: u.id, creditLineId: line.id, cutDate: cv.cut, statementCents: parsed.amountCents, statementAt: new Date() })
+        .onConflictDoUpdate({ target: [cycle.creditLineId, cycle.cutDate], set: { statementCents: parsed.amountCents, statementAt: new Date(), updatedAt: new Date() } });
       return sendMessage(chatId, `✓ ${esc(line.name)}: estado de cuenta de <b>${formatMXN(parsed.amountCents)}</b>. Vence el ${fmtDay(cv.due)} y sale de tu quincena del ${fmtShort(cv.payday)}.`);
     }
 

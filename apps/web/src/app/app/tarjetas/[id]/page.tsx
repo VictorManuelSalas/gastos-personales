@@ -62,7 +62,12 @@ export default async function CardPage({ params }: { params: Promise<{ id: strin
       status: v.status,
       amountLabel: formatMXN(v.amountCents),
       amountInput: centsToInput(v.amountCents),
-      sourceLabel: v.status === "paid" ? "Pagado" : SOURCE[v.source],
+      sourceLabel:
+        v.status === "paid"
+          ? "Pagado"
+          : v.newSpentCents
+            ? `${SOURCE[v.source]} ${formatMXN(v.amountCents - v.newSpentCents)} + ${formatMXN(v.newSpentCents)} en gastos nuevos`
+            : SOURCE[v.source],
       statementInput: centsToInput(v.row?.statementCents),
       minimumInput: centsToInput(v.row?.minimumCents),
       detailLabel:

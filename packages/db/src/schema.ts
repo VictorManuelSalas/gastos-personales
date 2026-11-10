@@ -26,6 +26,10 @@ export const user = pgTable("user", {
   logReminder: boolean("log_reminder").notNull().default(false),
   quietStart: integer("quiet_start").notNull().default(22),
   quietEnd: integer("quiet_end").notNull().default(8),
+  /** Último inicio de sesión (o registro). */
+  lastLoginAt: ts("last_login_at"),
+  /** Si tiene fecha, el administrador bloqueó la cuenta: no puede entrar ni usar el bot. */
+  blockedAt: ts("blocked_at"),
   createdAt: ts("created_at").notNull().defaultNow(),
   updatedAt: ts("updated_at").notNull().defaultNow(),
 });
@@ -164,6 +168,8 @@ export const cycle = pgTable(
     /** Fecha límite corregida a mano (si difiere de la calculada). */
     dueOverride: day("due_override"),
     statementCents: cents("statement_cents"),
+    /** Cuándo se capturó statementCents: en un ciclo abierto se suman los gastos registrados después. */
+    statementAt: ts("statement_at"),
     minimumCents: cents("minimum_cents"),
     /** Quincena asignada a mano (RN-04, movimiento manual). */
     paydayOverride: day("payday_override"),

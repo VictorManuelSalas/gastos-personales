@@ -8,12 +8,139 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import { fmtDay } from "@/lib/dates";
 import { requireUser } from "@/lib/session";
-import { archiveBillAction, createBillAction, payBillAction } from "@/server/actions/bills";
+import { archiveBillAction, createBillAction, payBillAction, updateBillAction } from "@/server/actions/bills";
 import { upcomingBills, userBills } from "@/server/finance/bills";
 
 export const metadata: Metadata = { title: "Servicios" };
 
 const EVERY: Record<number, string> = { 1: "Mensual", 2: "Bimestral", 3: "Trimestral", 6: "Semestral", 12: "Anual" };
+const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+type Opt = { id: string; name: string };
+type BillDefaults = Partial<Record<"name" | "kind" | "amount" | "day" | "every" | "anchor" | "source" | "categoryId" | "splitWith" | "splitParts", string>>;
+
+/** Campos del formulario de servicio: los comparten "Agregar" y "Editar". */
+function BillFields({
+  prefix,
+  options: { accounts, lines, cats, people },
+  defaults: d = {},
+}: {
+  prefix: string;
+  options: { accounts: Opt[]; lines: Opt[]; cats: (Opt & { emoji: string })[]; people: Opt[] };
+  defaults?: BillDefaults;
+}) {
+  const id = (k: string) => `${prefix}-${k}`;
+  return (
+    <>
+      <div>
+        <label htmlFor={id("name")} className="block text-[12px] text-haze">
+          Nombre
+        </label>
+        <input id={id("name")} name="name" defaultValue={d.name} placeholder="Internet, CFE, Netflix" className="field mt-1.5" />
+      </div>
+      <div>
+        <label htmlFor={id("kind")} className="block text-[12px] text-haze">
+          Tipo
+        </label>
+        <select id={id("kind")} name="kind" defaultValue={d.kind ?? "service"} className="field mt-1.5">
+          <option value="service">Servicio (el monto varía)</option>
+          <option value="subscription">Suscripción (monto fijo)</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor={id("amount")} className="block text-[12px] text-haze">
+          Monto aproximado
+        </label>
+        <input id={id("amount")} name="amount" defaultValue={d.amount} inputMode="decimal" placeholder="630" className="field num mt-1.5" />
+      </div>
+      <div>
+        <label htmlFor={id("day")} className="block text-[12px] text-haze">
+          Día de vencimiento
+        </label>
+        <input id={id("day")} name="day" defaultValue={d.day} type="number" min={1} max={31} placeholder="10" className="field num mt-1.5" />
+      </div>
+      <div>
+        <label htmlFor={id("every")} className="block text-[12px] text-haze">
+          Frecuencia
+        </label>
+        <select id={id("every")} name="every" defaultValue={d.every ?? "1"} className="field mt-1.5">
+          {Object.entries(EVERY).map(([v, l]) => (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor={id("anchor")} className="block text-[12px] text-haze">
+          Mes del próximo cobro (si no es mensual)
+        </label>
+        <select id={id("anchor")} name="anchor" defaultValue={d.anchor ?? ""} className="field mt-1.5">
+          <option value="">Este mes</option>
+          {MONTHS.map((m, i) => (
+            <option key={m} value={i + 1}>
+              {m}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor={id("source")} className="block text-[12px] text-haze">
+          Se paga con
+        </label>
+        <select id={id("source")} name="source" defaultValue={d.source ?? ""} className="field mt-1.5">
+          <option value="">Efectivo / sin cuenta</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={`a:${a.id}`}>
+              {a.name}
+            </option>
+          ))}
+          {lines.map((l) => (
+            <option key={l.id} value={`c:${l.id}`}>
+              Tarjeta {l.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor={id("cat")} className="block text-[12px] text-haze">
+          Categoría
+        </label>
+        <select id={id("cat")} name="categoryId" defaultValue={d.categoryId ?? ""} className="field mt-1.5">
+          <option value="">Sin categoría</option>
+          {cats.map((c) => (
+            <option key={c.id} value={c.id}>{`${c.emoji} ${c.name}`}</option>
+          ))}
+        </select>
+      </div>
+      <div className="grid grid-cols-[1fr_80px] gap-2">
+        <div>
+          <label htmlFor={id("split")} className="block text-[12px] text-haze">
+            Dividir con (opcional)
+          </label>
+          <input id={id("split")} name="splitWith" defaultValue={d.splitWith} list={id("people")} placeholder="Nombre" className="field mt-1.5" autoComplete="off" />
+          <datalist id={id("people")}>
+            {people.map((p) => (
+              <option key={p.id} value={p.name} />
+            ))}
+          </datalist>
+        </div>
+        <div>
+          <label htmlFor={id("parts")} className="block text-[12px] text-haze">
+            Entre
+          </label>
+          <select id={id("parts")} name="splitParts" defaultValue={d.splitParts ?? "1"} className="field mt-1.5">
+            {[1, 2, 3, 4].map((n) => (
+              <option key={n} value={n}>
+                {n === 1 ? "—" : n}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </>
+  );
+}
 
 export default async function BillsPage() {
   const { user } = await requireUser();
@@ -35,6 +162,7 @@ export default async function BillsPage() {
   const subs = bills.filter((b) => b.kind === "subscription");
   const subsCat = cats.find((c) => c.name === "Suscripciones")?.id ?? "";
   const servCat = cats.find((c) => c.name === "Hogar y servicios")?.id ?? "";
+  const options = { accounts, lines, cats, people };
   const sourceName = (b: (typeof bills)[number]) =>
     b.creditLineId ? `Tarjeta ${lines.find((l) => l.id === b.creditLineId)?.name ?? ""}` : (accounts.find((a) => a.id === b.accountId)?.name ?? "Cuenta principal");
 
@@ -77,112 +205,7 @@ export default async function BillsPage() {
       <Disclosure label="Agregar servicio o suscripción" variant="primary" className="rise d3 mt-10" defaultOpen={bills.length === 0}>
         <GlassCard interactive={false} className="p-6 md:p-8">
           <ActionForm action={createBillAction} closeOnOk className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label htmlFor="bl-name" className="block text-[12px] text-haze">
-                Nombre
-              </label>
-              <input id="bl-name" name="name" placeholder="Internet, CFE, Netflix" className="field mt-1.5" />
-            </div>
-            <div>
-              <label htmlFor="bl-kind" className="block text-[12px] text-haze">
-                Tipo
-              </label>
-              <select id="bl-kind" name="kind" defaultValue="service" className="field mt-1.5">
-                <option value="service">Servicio (el monto varía)</option>
-                <option value="subscription">Suscripción (monto fijo)</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="bl-amount" className="block text-[12px] text-haze">
-                Monto aproximado
-              </label>
-              <input id="bl-amount" name="amount" inputMode="decimal" placeholder="630" className="field num mt-1.5" />
-            </div>
-            <div>
-              <label htmlFor="bl-day" className="block text-[12px] text-haze">
-                Día de vencimiento
-              </label>
-              <input id="bl-day" name="day" type="number" min={1} max={31} placeholder="10" className="field num mt-1.5" />
-            </div>
-            <div>
-              <label htmlFor="bl-every" className="block text-[12px] text-haze">
-                Frecuencia
-              </label>
-              <select id="bl-every" name="every" defaultValue="1" className="field mt-1.5">
-                {Object.entries(EVERY).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="bl-anchor" className="block text-[12px] text-haze">
-                Mes del próximo cobro (si no es mensual)
-              </label>
-              <select id="bl-anchor" name="anchor" defaultValue="" className="field mt-1.5">
-                <option value="">Este mes</option>
-                {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"].map((m, i) => (
-                  <option key={m} value={i + 1}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="bl-source" className="block text-[12px] text-haze">
-                Se paga con
-              </label>
-              <select id="bl-source" name="source" defaultValue={accounts[0] ? `a:${accounts[0].id}` : ""} className="field mt-1.5">
-                <option value="">Efectivo / sin cuenta</option>
-                {accounts.map((a) => (
-                  <option key={a.id} value={`a:${a.id}`}>
-                    {a.name}
-                  </option>
-                ))}
-                {lines.map((l) => (
-                  <option key={l.id} value={`c:${l.id}`}>
-                    Tarjeta {l.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="bl-cat" className="block text-[12px] text-haze">
-                Categoría
-              </label>
-              <select id="bl-cat" name="categoryId" defaultValue={servCat} className="field mt-1.5">
-                <option value="">Sin categoría</option>
-                {cats.map((c) => (
-                  <option key={c.id} value={c.id}>{`${c.emoji} ${c.name}`}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-[1fr_80px] gap-2">
-              <div>
-                <label htmlFor="bl-split" className="block text-[12px] text-haze">
-                  Dividir con (opcional)
-                </label>
-                <input id="bl-split" name="splitWith" list="bl-people" placeholder="Nombre" className="field mt-1.5" autoComplete="off" />
-                <datalist id="bl-people">
-                  {people.map((p) => (
-                    <option key={p.id} value={p.name} />
-                  ))}
-                </datalist>
-              </div>
-              <div>
-                <label htmlFor="bl-parts" className="block text-[12px] text-haze">
-                  Entre
-                </label>
-                <select id="bl-parts" name="splitParts" defaultValue="1" className="field mt-1.5">
-                  {[1, 2, 3, 4].map((n) => (
-                    <option key={n} value={n}>
-                      {n === 1 ? "—" : n}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <BillFields prefix="bl" options={options} defaults={{ source: accounts[0] ? `a:${accounts[0].id}` : "", categoryId: servCat }} />
             <div className="sm:col-span-3">
               <SubmitButton>Agregar</SubmitButton>
               <p className="mt-2 text-[12px] text-haze">Si lo divides, cada pago anota la parte de la otra persona en Me deben.</p>
@@ -225,20 +248,50 @@ export default async function BillsPage() {
             <EmptyState title="Sin servicios todavía">Agrega luz, agua, gas, internet y tus suscripciones.</EmptyState>
           </div>
         ) : (
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {bills.map((b) => (
-              <li key={b.id} className="flex items-center gap-3 rounded-2xl bg-white/[.03] px-4 py-3 ring-1 ring-white/[.06]">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[14px]">{b.name}</p>
-                  <p className="text-[12px] text-haze">
-                    {EVERY[b.everyMonths] ?? `Cada ${b.everyMonths} meses`} · día {b.dayOfMonth} · {sourceName(b)}
-                    {b.splitParts > 1 ? ` · ÷ ${b.splitParts} con ${people.find((p) => p.id === b.splitContactId)?.name ?? "otra persona"}` : ""}
-                  </p>
+              <li key={b.id} className="rounded-2xl bg-white/[.03] px-4 py-3 ring-1 ring-white/[.06]">
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[14px]">{b.name}</p>
+                    <p className="text-[12px] text-haze">
+                      {EVERY[b.everyMonths] ?? `Cada ${b.everyMonths} meses`} · día {b.dayOfMonth}
+                      {b.everyMonths > 1 && b.anchorMonth ? ` (${MONTHS[b.anchorMonth - 1]})` : ""} · {sourceName(b)}
+                      {b.splitParts > 1 ? ` · ÷ ${b.splitParts} con ${people.find((p) => p.id === b.splitContactId)?.name ?? "otra persona"}` : ""}
+                    </p>
+                  </div>
+                  <span className="num text-[14px]">{formatMXN(b.amountCents)}</span>
+                  <ActionButton action={archiveBillAction} fields={{ id: b.id }} className="!px-3">
+                    Quitar
+                  </ActionButton>
                 </div>
-                <span className="num text-[14px]">{formatMXN(b.amountCents)}</span>
-                <ActionButton action={archiveBillAction} fields={{ id: b.id }} className="!px-3">
-                  Quitar
-                </ActionButton>
+                <div className="mt-3">
+                  <Disclosure label="Editar" buttonClassName="!px-4 !py-2 !text-[13px]">
+                    <ActionForm action={updateBillAction} closeOnOk resetOnOk={false} okMessage="Guardado." className="mt-3 grid gap-4 sm:grid-cols-2">
+                      <input type="hidden" name="id" value={b.id} />
+                      <BillFields
+                        prefix={`ed-${b.id}`}
+                        options={options}
+                        defaults={{
+                          name: b.name,
+                          kind: b.kind,
+                          amount: centsToInput(b.amountCents),
+                          day: String(b.dayOfMonth),
+                          every: String(b.everyMonths),
+                          anchor: b.anchorMonth ? String(b.anchorMonth) : "",
+                          source: b.creditLineId ? `c:${b.creditLineId}` : b.accountId ? `a:${b.accountId}` : "",
+                          categoryId: b.categoryId ?? "",
+                          splitWith: people.find((p) => p.id === b.splitContactId)?.name ?? "",
+                          splitParts: String(b.splitParts),
+                        }}
+                      />
+                      <div className="sm:col-span-2">
+                        <SubmitButton>Guardar cambios</SubmitButton>
+                        <p className="mt-2 text-[12px] text-haze">Los pagos que ya registraste no cambian; solo los próximos vencimientos.</p>
+                      </div>
+                    </ActionForm>
+                  </Disclosure>
+                </div>
               </li>
             ))}
           </ul>

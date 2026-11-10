@@ -2,6 +2,7 @@
 docs/privado/
 *.xlsx
 *.csv
+backups/
 
 # Node / Next.js
 node_modules/

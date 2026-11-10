@@ -113,6 +113,50 @@ Necesitan llaves VAPID en `.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPI
 
 **Más → Importar Excel**. Acepta el formato de pestañas mensuales (Tarjeta de crédito, Cantidad, Fecha de corte, Fecha límite de pago, Pagado) y la hoja de compras a meses (Producto, Banco, Precio, Meses a pagar, Meses abonados). La regla de cada tarjeta se deduce de tus últimos 6 meses. Puedes revisar todo antes de importar.
 
+## Respaldos
+
+`scripts/backup.sh` saca un `pg_dump` de la base y sube una copia a un bucket **privado** de Cloudflare R2. Conserva 30 días, en el servidor y en el bucket.
+
+**1. Bucket en Cloudflare:** R2 → *Create bucket* (por ejemplo `quincena-backups`), **sin** acceso público ni dominio público → *Manage API tokens* → token con permiso **Object Read & Write** solo para ese bucket. Copia el *Access Key ID*, el *Secret Access Key* y el endpoint `https://<cuenta>.r2.cloudflarestorage.com`.
+
+**2. `.env`** (ver `.env.example`):
+
+```bash
+BACKUP_S3_BUCKET=quincena-backups
+BACKUP_S3_ENDPOINT=https://<cuenta>.r2.cloudflarestorage.com
+BACKUP_S3_ACCESS_KEY=
+BACKUP_S3_SECRET_KEY=
+BACKUP_PING_URL=          # opcional: Healthchecks.io te avisa si falla
+```
+
+**3. Probar y programar** (con los contenedores en marcha):
+
+```bash
+bash scripts/backup.sh
+```
+
+```bash
+(crontab -l 2>/dev/null; echo '30 3 * * * cd ~/apps/gastos-personales && bash scripts/backup.sh >> backups/backup.log 2>&1') | crontab -
+```
+
+**Restaurar** (reemplaza la base; pide escribir `RESTAURAR`):
+
+```bash
+bash scripts/restore.sh 20261110T093000Z
+```
+
+El nombre es la carpeta del respaldo en el bucket; también acepta una carpeta local (`backups/20261110T093000Z`).
+
+**Prueba de restauración (cada mes):** restaura en una base temporal, muestra cuántos registros tiene y la borra. No toca tus datos.
+
+```bash
+bash scripts/restore.sh 20261110T093000Z --prueba
+```
+
+> ⚠️ Los respaldos no van cifrados: quien tenga acceso al bucket o al token puede leer las finanzas de todos. Mantén el bucket privado y el token solo con permiso sobre él.
+>
+> Guarda fuera del servidor (en tu gestor de contraseñas) `APP_ENCRYPTION_KEY` (o `BETTER_AUTH_SECRET` si no la definiste): sin ella, las API keys de IA restauradas no se pueden leer y cada usuario tendrá que capturarlas otra vez.
+
 ## Estructura
 
 ```
