@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   applicationName: "Quincena",
   appleWebApp: { capable: true, title: "Quincena", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
-  icons: { icon: "/icons/192", apple: "/icons/apple" },
+  icons: { icon: "/icons/192?v=2", apple: "/icons/apple?v=2" },
 };
 
 export const viewport: Viewport = {

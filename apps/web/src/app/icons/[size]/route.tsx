@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { QGlyph } from "@/components/ui/brand";
 
 // Íconos PNG de la PWA generados en el servidor (sin binarios en el repo).
 const SIZES: Record<string, { px: number; maskable: boolean }> = {
@@ -15,7 +16,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ size: s
 
   const { px, maskable } = spec;
   // Los íconos "maskable" dejan margen seguro (80 % central) para que Android los recorte.
-  const glyph = Math.round(px * (maskable ? 0.42 : 0.52));
+  const glyph = Math.round(px * (maskable ? 0.62 : 0.74));
 
   return new ImageResponse(
     (
@@ -30,26 +31,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ size: s
           borderRadius: maskable ? 0 : px * 0.22,
         }}
       >
-        <div
-          style={{
-            width: glyph * 1.5,
-            height: glyph * 1.5,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: glyph * 0.42,
-            background: "linear-gradient(180deg, #dfe4ff 0%, #8fa8ff 100%)",
-          }}
-        >
-          <svg width={glyph} height={glyph} viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 3v18M7 7.5c0-1.9 2.2-3 5-3s5 1.1 5 3-2.2 2.6-5 3.3-5 1.6-5 3.7 2.2 3 5 3 5-1.1 5-3"
-              stroke="#0d0e15"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-            />
-          </svg>
-        </div>
+        <QGlyph size={glyph} />
       </div>
     ),
     {
