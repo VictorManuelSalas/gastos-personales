@@ -9,6 +9,6 @@ load_env() {
     key=${line%%=*}; val=${line#*=}
     [[ $key =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
     if [[ $val == \"*\" || $val == \'*\' ]]; then val=${val:1:${#val}-2}; fi
-    [ -z "${!key+x}" ] && export "$key=$val"
+    if [ -z "${!key+x}" ]; then export "$key=$val"; fi
   done < "${1:-.env}"
 }

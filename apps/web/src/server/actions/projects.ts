@@ -107,6 +107,17 @@ export async function addCostAction(_p: ActionState, f: FormData): Promise<Actio
   return ok();
 }
 
+/** Quita el proyecto de la lista. Sus cobros y costos se quedan en Movimientos y en tus cuentas. */
+export async function archiveProjectAction(f: FormData) {
+  const { user } = await requireUser();
+  await db
+    .update(project)
+    .set({ archivedAt: new Date() })
+    .where(and(eq(project.id, str(f, "id")), eq(project.userId, user.id)));
+  revalidatePath("/app/proyectos");
+  redirect("/app/proyectos");
+}
+
 export async function updateInvestmentAction(_p: ActionState, f: FormData): Promise<ActionState> {
   const { user } = await requireUser();
   const p = await ownProject(user.id, str(f, "projectId"));

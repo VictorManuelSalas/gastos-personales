@@ -9,7 +9,7 @@ import { ActionButton, ActionForm, SubmitButton } from "@/components/ui/action-f
 import { Disclosure } from "@/components/ui/disclosure";
 import { GlassCard } from "@/components/ui/glass-card";
 import { requireUser } from "@/lib/session";
-import { addClientAction, addCostAction, chargeClientAction, toggleClientAction, updateInvestmentAction } from "@/server/actions/projects";
+import { addClientAction, addCostAction, archiveProjectAction, chargeClientAction, toggleClientAction, updateInvestmentAction } from "@/server/actions/projects";
 import { projectSummary } from "@/server/finance/projects";
 
 export const metadata: Metadata = { title: "Proyecto" };
@@ -142,6 +142,13 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             </ActionForm>
           </GlassCard>
         </Disclosure>
+      </section>
+
+      <section className="mt-12 flex flex-wrap items-center gap-4">
+        <ActionButton action={archiveProjectAction} fields={{ id: s.project.id }} variant="danger" pending="Archivando…">
+          Archivar proyecto
+        </ActionButton>
+        <p className="min-w-0 flex-1 text-[12px] text-haze">Lo quita de la lista. Sus cobros y costos se quedan en Movimientos y en el saldo de tus cuentas.</p>
       </section>
     </div>
   );
